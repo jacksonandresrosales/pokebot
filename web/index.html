@@ -77,13 +77,18 @@
 
         <div id="sesion" class="session" hidden>
           <div class="session-user">
-            <span id="sesion-avatar" class="session-avatar" aria-hidden="true">U</span>
+            <span class="session-avatar" aria-hidden="true">
+              <img id="sesion-imagen" class="session-image" alt="" hidden />
+              <span id="sesion-inicial">U</span>
+            </span>
             <div>
               <span>Sesión iniciada</span>
               <strong id="sesion-nombre"></strong>
             </div>
           </div>
-          <a class="button button-secondary" href="/api/auth/logout">Cerrar sesión</a>
+          <form class="logout-form" action="/api/auth/logout" method="post">
+            <button class="button button-secondary" type="submit">Cerrar sesión</button>
+          </form>
         </div>
 
         <div class="privacy-note">
@@ -103,7 +108,8 @@
       const acceso = document.querySelector("#acceso");
       const sesion = document.querySelector("#sesion");
       const sesionNombre = document.querySelector("#sesion-nombre");
-      const sesionAvatar = document.querySelector("#sesion-avatar");
+      const sesionImagen = document.querySelector("#sesion-imagen");
+      const sesionInicial = document.querySelector("#sesion-inicial");
 
       fetch("/api/health")
         .then((respuesta) => {
@@ -122,7 +128,17 @@
           acceso.hidden = true;
           sesion.hidden = false;
           sesionNombre.textContent = usuario.nombre;
-          sesionAvatar.textContent = usuario.nombre.trim().charAt(0).toUpperCase() || "U";
+          sesionInicial.textContent = usuario.nombre.trim().charAt(0).toUpperCase() || "U";
+
+          if (usuario.avatarUrl) {
+            sesionImagen.src = usuario.avatarUrl;
+            sesionImagen.hidden = false;
+            sesionInicial.hidden = true;
+            sesionImagen.addEventListener("error", () => {
+              sesionImagen.hidden = true;
+              sesionInicial.hidden = false;
+            }, { once: true });
+          }
         })
         .catch(() => {
           acceso.hidden = false;

@@ -237,6 +237,8 @@ h2 {
   padding: 0.82rem 1rem 0.82rem 1.15rem;
   border: 1px solid transparent;
   border-radius: 9px;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 0.9rem;
   font-weight: 750;
   text-decoration: none;
@@ -300,10 +302,20 @@ h2 {
 .session-avatar {
   width: 2.6rem;
   height: 2.6rem;
+  overflow: hidden;
   color: var(--accent-ink);
   background: var(--accent);
   font-size: 0.95rem;
 }
+
+.session-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.logout-form { margin: 0; }
 
 .session-user div {
   display: flex;

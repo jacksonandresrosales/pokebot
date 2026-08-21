@@ -15,6 +15,7 @@ const nombreCookie = "pokebot_sesion";
 interface Sesion {
   discordUserId: string;
   nombre: string;
+  avatarUrl: string | null;
   rol: UsuarioEntrenador["rol"];
   puedeEntrenar: boolean;
 }
@@ -155,7 +156,11 @@ async function manejarCallbackDiscord(
     id: string;
     username: string;
     global_name?: string | null;
+    avatar: string | null;
   };
+  const avatarUrl = usuarioDiscord.avatar
+    ? `https://cdn.discordapp.com/avatars/${usuarioDiscord.id}/${usuarioDiscord.avatar}.webp?size=128`
+    : null;
   const usuario = await registrarUsuario(
     usuarioDiscord.id,
     usuarioDiscord.global_name ?? usuarioDiscord.username,
@@ -164,6 +169,7 @@ async function manejarCallbackDiscord(
   establecerCookieSesion(respuesta, {
     discordUserId: usuario.discordUserId,
     nombre: usuario.nombre,
+    avatarUrl,
     rol: usuario.rol,
     puedeEntrenar: usuario.puedeEntrenar,
   });
@@ -221,7 +227,7 @@ const servidor = createServer(async (solicitud, respuesta) => {
         "Set-Cookie",
         `${nombreCookie}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`,
       );
-      responderJson(respuesta, 200, { ok: true });
+      redirigir(respuesta, "/");
       return;
     }
 
