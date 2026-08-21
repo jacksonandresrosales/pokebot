@@ -3,76 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Panel privado de entrenamiento de PokeBot" />
-    <title>PokeBot | Entrenamiento</title>
+    <meta name="description" content="Acceso privado a PokeBot" />
+    <title>PokeBot</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <a class="brand-lockup" href="/" aria-label="PokeBot, inicio">
-        <span class="brand-mark" aria-hidden="true">PB</span>
-        <span>PokeBot</span>
-      </a>
+    <div class="ambient" aria-hidden="true"></div>
 
-      <div class="status-line" aria-live="polite">
-        <span class="status-dot" aria-hidden="true"></span>
-        <span id="estado">Comprobando conexión...</span>
-      </div>
-    </header>
-
-    <main class="shell">
-      <section class="intro" aria-labelledby="titulo">
-        <p class="eyebrow">Entrenamiento entre amigos</p>
-        <h1 id="titulo">La voz se entrena en grupo.</h1>
-        <p class="lead">
-          Aporta ejemplos, evalúa respuestas y ayuda a PokeBot a sonar cada vez más familiar.
-        </p>
-
-        <div class="conversation" aria-label="Ejemplo de entrenamiento">
-          <article class="message">
-            <span class="avatar" aria-hidden="true">TÚ</span>
-            <div>
-              <div class="message-meta">
-                <strong>Un entrenador</strong>
-                <span>Mensaje de Discord</span>
-              </div>
-              <p>oe vas a entrar hoy o te vas a desaparecer otra vez</p>
-            </div>
-          </article>
-
-          <article class="message bot-message">
-            <span class="avatar bot-avatar" aria-hidden="true">PB</span>
-            <div>
-              <div class="message-meta">
-                <strong>PokeBot</strong>
-                <span>Respuesta en entrenamiento</span>
-              </div>
-              <p>ya voy oe dame chance que ni he abierto discord</p>
-              <div class="feedback" aria-label="Ejemplo de evaluación">
-                <span>¿Suena bien?</span>
-                <span class="feedback-choice" aria-label="Voto positivo">👍 12</span>
-                <span class="feedback-choice" aria-label="Voto negativo">👎 2</span>
-              </div>
-            </div>
-          </article>
+    <main class="page">
+      <section class="identity" aria-labelledby="titulo">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">PB</span>
+          <span>PokeBot</span>
         </div>
+        <h1 id="titulo">Entrenado por quienes mejor lo conocen.</h1>
       </section>
 
-      <aside class="access-panel" aria-labelledby="acceso-titulo">
-        <p class="panel-label">Acceso privado</p>
-        <h2 id="acceso-titulo">Entra al panel de entrenamiento.</h2>
-        <p class="panel-copy">
-          Usa tu cuenta de Discord. Solo los amigos autorizados podrán aportar ejemplos y evaluar respuestas.
-        </p>
-
+      <section class="auth" aria-labelledby="acceso-titulo">
         <div id="acceso">
+          <h2 id="acceso-titulo">Acceso privado</h2>
           <a class="button button-primary" href="/api/auth/discord">
-            <span>Entrar con Discord</span>
-            <span class="button-arrow" aria-hidden="true">→</span>
+            <span>Continuar con Discord</span>
+            <span aria-hidden="true">→</span>
           </a>
-          <p class="fine-print">
-            Discord confirma tu identidad. PokeBot nunca recibe tu contraseña.
-          </p>
+          <p>Solo para amigos autorizados.</p>
         </div>
 
         <div id="sesion" class="session" hidden>
@@ -81,27 +35,22 @@
               <img id="sesion-imagen" class="session-image" alt="" hidden />
               <span id="sesion-inicial">U</span>
             </span>
-            <div>
+            <div class="session-copy">
               <span>Sesión iniciada</span>
               <strong id="sesion-nombre"></strong>
             </div>
           </div>
-          <form class="logout-form" action="/api/auth/logout" method="post">
+          <form action="/api/auth/logout" method="post">
             <button class="button button-secondary" type="submit">Cerrar sesión</button>
           </form>
         </div>
 
-        <div class="privacy-note">
-          <strong>Tu opinión sí cuenta.</strong>
-          <p>Cada voto ayuda a decidir qué respuestas se convierten en ejemplos de estilo.</p>
+        <div class="health" aria-live="polite">
+          <span class="health-dot" aria-hidden="true"></span>
+          <span id="estado">Comprobando conexión...</span>
         </div>
-      </aside>
+      </section>
     </main>
-
-    <footer class="footer">
-      <span>Proyecto privado</span>
-      <span>Entrenado con consentimiento</span>
-    </footer>
 
     <script>
       const estado = document.querySelector("#estado");
@@ -113,11 +62,11 @@
 
       fetch("/api/health")
         .then((respuesta) => {
-          estado.textContent = respuesta.ok ? "Sistema operativo" : "Sistema con incidencias";
+          estado.textContent = respuesta.ok ? "PokeBot disponible" : "PokeBot no disponible";
           document.body.dataset.health = respuesta.ok ? "ok" : "error";
         })
         .catch(() => {
-          estado.textContent = "Servidor no disponible";
+          estado.textContent = "PokeBot no disponible";
           document.body.dataset.health = "error";
         });
 
