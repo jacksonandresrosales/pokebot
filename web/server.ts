@@ -253,8 +253,8 @@ async function manejarNuevaImportacion(
 ): Promise<void> {
   const sesion = await obtenerSesionActual(solicitud);
 
-  if (!sesion || sesion.rol !== "administrador") {
-    responderJson(respuesta, 403, { error: "Solo los administradores pueden importar mensajes." });
+  if (!sesion) {
+    responderJson(respuesta, 401, { error: "Debes iniciar sesión para importar mensajes." });
     return;
   }
 
@@ -291,9 +291,10 @@ async function manejarNuevaImportacion(
     ? contenido.nombreObjetivo.trim()
     : "";
   const texto = typeof contenido.texto === "string" ? contenido.texto.trim() : "";
-  const aportadoPorId = typeof contenido.aportadoPorId === "string"
+  const aportadoPorIdSolicitado = typeof contenido.aportadoPorId === "string"
     ? contenido.aportadoPorId
     : "";
+  let aportadoPorId = aportadoPorIdSolicitado;
 
   if (nombreArchivo.length < 1 || nombreArchivo.length > 160) {
     responderJson(respuesta, 400, { error: "El nombre del archivo no es válido." });
@@ -308,6 +309,11 @@ async function manejarNuevaImportacion(
   if (nombreObjetivo.length < 1 || nombreObjetivo.length > 80) {
     responderJson(respuesta, 400, { error: "Indica cómo aparece Poke en la conversación." });
     return;
+  }
+
+  if (sesion.rol !== "administrador") {
+    const usuarioSesion = await obtenerUsuarioPorDiscordId(sesion.discordUserId);
+    aportadoPorId = usuarioSesion?.id ?? "";
   }
 
   if (!esUuid(aportadoPorId)) {

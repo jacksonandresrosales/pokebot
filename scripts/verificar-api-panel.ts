@@ -9,6 +9,7 @@ import { pool } from "../src/db/client.js";
 const entradaPrueba = `prueba-panel-${randomUUID()}`;
 const rasgoPrueba = `A Poke le gusta la música de prueba ${randomUUID()}.`;
 const archivoMensajesPrueba = `mensajes-panel-${randomUUID()}.txt`;
+const archivoMensajesEntrenadorPrueba = `mensajes-entrenador-${randomUUID()}.txt`;
 const discordIdPrueba = `9${Date.now()}${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`;
 
 function crearCookie(sesion: {
@@ -179,6 +180,26 @@ try {
     rol: "entrenador",
     puedeEntrenar: true,
   });
+  const importacionEntrenador = await fetch(`${configuracion.webUrl()}/api/message-imports`, {
+    method: "POST",
+    headers: {
+      Cookie: cookieEntrenador,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      nombreArchivo: archivoMensajesEntrenadorPrueba,
+      formato: "txt",
+      nombreObjetivo: "Poke",
+      aportadoPorId: "",
+      texto: "Poke: aporte de un entrenador autorizado",
+    }),
+  });
+
+  if (importacionEntrenador.status !== 201) {
+    throw new Error(
+      `Un entrenador autorizado no pudo importar mensajes: ${importacionEntrenador.status}.`,
+    );
+  }
   const completarTutorial = await fetch(
     `${configuracion.webUrl()}/api/onboarding/complete`,
     { method: "POST", headers: { Cookie: cookieEntrenador } },
@@ -355,6 +376,7 @@ try {
         )
       ).rows[0]?.importancia === 4,
       importacionCreada: importacion.status === 201,
+      importacionEntrenador: importacionEntrenador.status === 201,
       archivoGrandeRechazado: importacionDemasiadoGrande.status === 413,
       datosMensajesVisibles: Array.isArray(panelInicial.importaciones)
         && Array.isArray(panelInicial.propuestas),
@@ -374,12 +396,16 @@ try {
     [rasgoPrueba],
   );
   await pool.query(
-    `delete from usuarios where discord_user_id = $1`,
-    [discordIdPrueba],
+    `delete from importaciones_mensajes where nombre_archivo = $1`,
+    [archivoMensajesPrueba],
   );
   await pool.query(
     `delete from importaciones_mensajes where nombre_archivo = $1`,
-    [archivoMensajesPrueba],
+    [archivoMensajesEntrenadorPrueba],
+  );
+  await pool.query(
+    `delete from usuarios where discord_user_id = $1`,
+    [discordIdPrueba],
   );
   await pool.end();
 }

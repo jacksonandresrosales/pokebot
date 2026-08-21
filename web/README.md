@@ -7,7 +7,7 @@ Panel minimalista para entrenar y supervisar el estilo del bot. Incluye:
 - métricas de votos y actividad de los últimos siete días;
 - listado de amigos autorizados para entrenarlo.
 - gestión de roles, accesos e importancia de cada entrenador.
-- importación y análisis de conversaciones con aprobación manual.
+- importación de conversaciones por cualquier entrenador autorizado y análisis con aprobación manual del administrador.
 - tutorial inicial para orientar a cada tipo de usuario.
 
 Las conversaciones importadas deben ser archivos TXT, JSON o CSV de hasta 2 MB.

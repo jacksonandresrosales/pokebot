@@ -540,7 +540,6 @@ export async function crearImportacionMensajes(
       join usuarios as creador on creador.discord_user_id = $6
       where aportante.id = $5
         and aportante.puede_entrenar = true
-        and creador.rol = 'administrador'
         and creador.puede_entrenar = true
       returning id
     `,

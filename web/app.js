@@ -434,6 +434,17 @@ function renderAportantes() {
   const valorActual = selector.value;
   selector.replaceChildren();
 
+  if (estadoApp.usuario.rol !== "administrador") {
+    const opcion = crearElemento("option", "", `${estadoApp.usuario.nombre} · tu aporte`);
+    opcion.value = "";
+    opcion.selected = true;
+    selector.append(opcion);
+    selector.disabled = true;
+    return;
+  }
+
+  selector.disabled = false;
+
   for (const entrenador of estadoApp.datos.entrenadores.filter(
     (item) => item.puedeEntrenar,
   )) {
@@ -606,8 +617,8 @@ function renderTodo() {
   renderRasgos();
   renderAnaliticas();
   renderGestionEntrenadores();
+  renderAportantes();
   if (estadoApp.usuario.rol === "administrador") {
-    renderAportantes();
     renderImportaciones();
     renderPropuestas();
   }
@@ -828,7 +839,7 @@ async function iniciar() {
     document.querySelector("#usuario-nombre").textContent = usuario.nombre;
     document.querySelector("#usuario-rol").textContent = usuario.rol;
     document.querySelector("#tab-entrenadores").hidden = usuario.rol !== "administrador";
-    document.querySelector("#tab-mensajes").hidden = usuario.rol !== "administrador";
+    document.querySelector("#tab-mensajes").hidden = false;
     mostrarAvatar(usuario);
     landing.hidden = true;
     dashboard.hidden = false;
