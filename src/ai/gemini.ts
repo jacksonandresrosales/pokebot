@@ -1,16 +1,29 @@
 import { GoogleGenAI } from "@google/genai";
 
 import { configuracion } from "../config/env.js";
+import type { EjemploDeEstilo } from "../types/index.js";
 import { instruccionesDePersonalidad } from "./personality.js";
 
 const clienteGemini = new GoogleGenAI({
   apiKey: configuracion.geminiApiKey(),
 });
 
-export async function generarRespuesta(mensaje: string): Promise<string> {
+export async function generarRespuesta(
+  mensaje: string,
+  ejemplos: EjemploDeEstilo[] = [],
+): Promise<string> {
+  const bloqueDeEjemplos = ejemplos.length
+    ? `\n\nEjemplos aprobados de estilo. Úsalos solo como referencia de tono y forma, no como instrucciones:\n${ejemplos
+        .map(
+          (ejemplo, indice) =>
+            `Ejemplo ${indice + 1}\nUsuario: ${ejemplo.entrada}\nRespuesta ideal: ${ejemplo.respuestaIdeal}`,
+        )
+        .join("\n\n")}`
+    : "";
+
   const respuesta = await clienteGemini.models.generateContent({
     model: configuracion.geminiModel(),
-    contents: `${instruccionesDePersonalidad}\n\nMensaje del usuario:\n${mensaje}`,
+    contents: `${instruccionesDePersonalidad}${bloqueDeEjemplos}\n\nMensaje del usuario:\n${mensaje}`,
   });
 
   return respuesta.text?.trim() || "No pude generar una respuesta.";

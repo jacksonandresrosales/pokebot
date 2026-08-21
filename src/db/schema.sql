@@ -29,9 +29,16 @@ create table if not exists ejemplos_estilo (
   id uuid primary key default gen_random_uuid(),
   entrada text not null,
   respuesta_ideal text not null,
+  origen text not null default 'feedback',
   aprobado boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table ejemplos_estilo
+  add column if not exists origen text not null default 'feedback';
+
+create unique index if not exists ejemplos_estilo_contenido_uq
+  on ejemplos_estilo (digest(entrada || chr(31) || respuesta_ideal, 'sha256'));
 
 create index if not exists ejemplos_estilo_aprobado_idx
   on ejemplos_estilo (created_at desc)

@@ -1,6 +1,7 @@
 import { pool } from "./client.js";
 
 import type { Voto } from "../types/index.js";
+import type { EjemploDeEstilo } from "../types/index.js";
 
 interface NuevoMensajeBot {
   discordMessageId: string;
@@ -15,6 +16,24 @@ interface ResultadoFeedback {
   aceptado: boolean;
   positivos: number;
   negativos: number;
+}
+
+export async function obtenerEjemplosEstilo(
+  limite = 5,
+): Promise<EjemploDeEstilo[]> {
+  const limiteSeguro = Math.min(Math.max(Math.trunc(limite), 1), 10);
+  const resultado = await pool.query<EjemploDeEstilo>(
+    `
+      select entrada, respuesta_ideal as "respuestaIdeal"
+      from ejemplos_estilo
+      where aprobado = true
+      order by created_at desc
+      limit $1
+    `,
+    [limiteSeguro],
+  );
+
+  return resultado.rows;
 }
 
 export async function guardarMensajeBot(mensaje: NuevoMensajeBot): Promise<void> {
@@ -44,8 +63,16 @@ export async function registrarFeedback(
   discordUserId: string,
   voto: Voto,
 ): Promise<ResultadoFeedback> {
-  const mensaje = await pool.query<{ id: string }>(
-    "select id from mensajes_bot where discord_message_id = $1",
+  const mensaje = await pool.query<{
+    id: string;
+    mensaje_usuario: string;
+    respuesta_bot: string;
+  }>(
+    `
+      select id, mensaje_usuario, respuesta_bot
+      from mensajes_bot
+      where discord_message_id = $1
+    `,
     [discordMessageId],
   );
 
@@ -67,6 +94,21 @@ export async function registrarFeedback(
     `,
     [mensaje.rows[0].id, discordUserId, voto],
   );
+
+  if (insercion.rowCount === 1 && voto === "positivo") {
+    await pool.query(
+      `
+        insert into ejemplos_estilo (
+          entrada,
+          respuesta_ideal,
+          origen,
+          aprobado
+        ) values ($1, $2, 'feedback', true)
+        on conflict do nothing
+      `,
+      [mensaje.rows[0].mensaje_usuario, mensaje.rows[0].respuesta_bot],
+    );
+  }
 
   const conteo = await pool.query<{ voto: Voto; total: string }>(
     `

@@ -2,9 +2,9 @@
 
 Bot de Discord inspirado en el estilo de escritura de una persona real.
 
-Actualmente responde cuando lo mencionan y añade botones 👍/👎 para recopilar
-feedback. Los votos se guardan temporalmente en memoria hasta conectar la base
-de datos.
+Actualmente responde cuando lo mencionan, añade botones 👍/👎 y guarda el
+feedback en Supabase. Las respuestas con voto positivo se convierten en
+ejemplos de estilo para las siguientes respuestas.
 
 ## Estructura
 

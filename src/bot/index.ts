@@ -3,7 +3,12 @@ import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import { generarRespuesta, obtenerModeloUsado } from "../ai/gemini.js";
 import { configuracion } from "../config/env.js";
 import { verificarConexion } from "../db/client.js";
-import { guardarMensajeBot, registrarFeedback } from "../db/repository.js";
+import {
+  guardarMensajeBot,
+  obtenerEjemplosEstilo,
+  registrarFeedback,
+} from "../db/repository.js";
+import type { EjemploDeEstilo } from "../types/index.js";
 import {
   crearBotonesDeFeedback,
   obtenerVotoDesdeBoton,
@@ -38,7 +43,15 @@ export async function iniciarBot(): Promise<void> {
 
     try {
       await mensaje.channel.sendTyping();
-      const respuesta = await generarRespuesta(texto);
+      let ejemplos: EjemploDeEstilo[] = [];
+
+      try {
+        ejemplos = await obtenerEjemplosEstilo();
+      } catch (error) {
+        console.error("No se pudieron cargar los ejemplos de estilo:", error);
+      }
+
+      const respuesta = await generarRespuesta(texto, ejemplos);
       const mensajeBot = await mensaje.reply({
         content: respuesta,
         components: [crearBotonesDeFeedback()],
@@ -74,9 +87,9 @@ export async function iniciarBot(): Promise<void> {
 
     try {
       const resultado = await registrarFeedback(
-      interaccion.message.id,
-      interaccion.user.id,
-      voto,
+        interaccion.message.id,
+        interaccion.user.id,
+        voto,
       );
 
       if (!resultado.encontrado) {
