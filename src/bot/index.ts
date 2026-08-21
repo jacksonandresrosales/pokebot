@@ -6,6 +6,7 @@ import { verificarConexion } from "../db/client.js";
 import {
   guardarMensajeBot,
   obtenerEjemplosEstilo,
+  obtenerRasgosComportamiento,
   registrarFeedback,
 } from "../db/repository.js";
 import type { EjemploDeEstilo } from "../types/index.js";
@@ -44,14 +45,18 @@ export async function iniciarBot(): Promise<void> {
     try {
       await mensaje.channel.sendTyping();
       let ejemplos: EjemploDeEstilo[] = [];
+      let rasgos: string[] = [];
 
       try {
-        ejemplos = await obtenerEjemplosEstilo();
+        [ejemplos, rasgos] = await Promise.all([
+          obtenerEjemplosEstilo(),
+          obtenerRasgosComportamiento(),
+        ]);
       } catch (error) {
-        console.error("No se pudieron cargar los ejemplos de estilo:", error);
+        console.error("No se pudo cargar el contexto de entrenamiento:", error);
       }
 
-      const respuesta = await generarRespuesta(texto, ejemplos);
+      const respuesta = await generarRespuesta(texto, ejemplos, rasgos);
       const mensajeBot = await mensaje.reply({
         content: respuesta,
         components: [crearBotonesDeFeedback()],

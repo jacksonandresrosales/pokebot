@@ -7,6 +7,7 @@ import { obtenerUsuarioPorDiscordId } from "../src/db/repository.js";
 import { pool } from "../src/db/client.js";
 
 const entradaPrueba = `prueba-panel-${randomUUID()}`;
+const rasgoPrueba = `A Poke le gusta la música de prueba ${randomUUID()}.`;
 const archivoMensajesPrueba = `mensajes-panel-${randomUUID()}.txt`;
 const discordIdPrueba = `9${Date.now()}${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`;
 
@@ -96,6 +97,19 @@ try {
 
   if (creacion.status !== 201) {
     throw new Error(`La creación respondió con estado ${creacion.status}.`);
+  }
+
+  const creacionRasgo = await fetch(`${configuracion.webUrl()}/api/traits`, {
+    method: "POST",
+    headers: {
+      Cookie: cookie,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ contenido: rasgoPrueba }),
+  });
+
+  if (creacionRasgo.status !== 201) {
+    throw new Error(`La creación del rasgo respondió con estado ${creacionRasgo.status}.`);
   }
 
 
@@ -204,6 +218,7 @@ try {
   );
   const panelActualizado = (await panelActualizadoRespuesta.json()) as {
     ejemplos: Array<{ id: string; entrada: string; aprobado: boolean }>;
+    rasgos: Array<{ id: string; contenido: string; activo: boolean }>;
   };
   const ejemplo = panelActualizado.ejemplos.find(
     (item) => item.entrada === entradaPrueba,
@@ -211,6 +226,12 @@ try {
 
   if (!ejemplo) {
     throw new Error("El ejemplo temporal no apareció en el panel.");
+  }
+
+  const rasgo = panelActualizado.rasgos.find((item) => item.contenido === rasgoPrueba);
+
+  if (!rasgo) {
+    throw new Error("El rasgo temporal no apareció en el panel.");
   }
 
   const pausa = await fetch(
@@ -227,6 +248,22 @@ try {
 
   if (!pausa.ok) {
     throw new Error(`La pausa respondió con estado ${pausa.status}.`);
+  }
+
+  const pausaRasgo = await fetch(
+    `${configuracion.webUrl()}/api/traits/${rasgo.id}`,
+    {
+      method: "PATCH",
+      headers: {
+        Cookie: cookie,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ activo: false }),
+    },
+  );
+
+  if (!pausaRasgo.ok) {
+    throw new Error(`La pausa del rasgo respondió con estado ${pausaRasgo.status}.`);
   }
 
   const estado = await pool.query<{ aprobado: boolean }>(
@@ -246,6 +283,13 @@ try {
       mensajes: panelInicial.analiticas.mensajes,
       creacion: creacion.status,
       ejemploPausado: estado.rows[0]?.aprobado === false,
+      rasgoCreado: creacionRasgo.status === 201,
+      rasgoPausado: (
+        await pool.query<{ activo: boolean }>(
+          `select activo from rasgos_comportamiento where id = $1`,
+          [rasgo.id],
+        )
+      ).rows[0]?.activo === false,
       entrenadorCreado: nuevoEntrenador.status === 201,
       entrenadorRestringido: intentoSinPermiso.status === 403,
       administradorSecundario: cambioComoAdministrador.ok,
@@ -268,6 +312,10 @@ try {
         and origen = 'manual'
     `,
     [entradaPrueba],
+  );
+  await pool.query(
+    `delete from rasgos_comportamiento where contenido = $1`,
+    [rasgoPrueba],
   );
   await pool.query(
     `delete from usuarios where discord_user_id = $1`,

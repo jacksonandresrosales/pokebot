@@ -13,14 +13,17 @@ import {
 import {
   actualizarEntrenador,
   actualizarAprobacionEjemplo,
+  actualizarEstadoRasgoComportamiento,
   asegurarAdministradorPrincipal,
   crearEntrenador,
   crearEjemploManual,
+  crearRasgoComportamiento,
   crearImportacionMensajes,
   actualizarEstadoPropuesta,
   guardarAnalisisImportacion,
   iniciarAnalisisImportacion,
   listarEjemplosPanel,
+  listarRasgosComportamientoPanel,
   listarEntrenadores,
   listarImportacionesMensajes,
   listarPropuestasEntrenamiento,
@@ -185,8 +188,9 @@ async function manejarDashboard(
   }
 
   const esAdministrador = sesion.rol === "administrador";
-  const [ejemplos, analiticas, entrenadores, importaciones, propuestas] = await Promise.all([
+  const [ejemplos, rasgos, analiticas, entrenadores, importaciones, propuestas] = await Promise.all([
     listarEjemplosPanel(),
+    listarRasgosComportamientoPanel(),
     obtenerAnaliticasEntrenamiento(),
     listarEntrenadores(),
     esAdministrador ? listarImportacionesMensajes() : Promise.resolve([]),
@@ -204,6 +208,7 @@ async function manejarDashboard(
 
   responderJson(respuesta, 200, {
     ejemplos,
+    rasgos,
     analiticas,
     entrenadores: entrenadoresVisibles,
     importaciones,
@@ -584,6 +589,82 @@ async function manejarEstadoEjemplo(
   );
 }
 
+async function manejarNuevoRasgo(
+  solicitud: IncomingMessage,
+  respuesta: ServerResponse,
+): Promise<void> {
+  const sesion = await obtenerSesionActual(solicitud);
+
+  if (!sesion) {
+    responderJson(respuesta, 401, { error: "No tienes permiso para entrenar." });
+    return;
+  }
+
+  let contenido: { contenido?: unknown };
+
+  try {
+    contenido = await leerJson(solicitud);
+  } catch {
+    responderJson(respuesta, 400, { error: "El contenido enviado no es válido." });
+    return;
+  }
+
+  const rasgo = typeof contenido.contenido === "string" ? contenido.contenido.trim() : "";
+
+  if (rasgo.length < 2 || rasgo.length > 500) {
+    responderJson(respuesta, 400, { error: "El rasgo debe tener entre 2 y 500 caracteres." });
+    return;
+  }
+
+  const creado = await crearRasgoComportamiento(rasgo, sesion.discordUserId);
+
+  if (!creado) {
+    responderJson(respuesta, 409, { error: "Ese rasgo ya existe." });
+    return;
+  }
+
+  responderJson(respuesta, 201, { ok: true });
+}
+
+async function manejarEstadoRasgo(
+  solicitud: IncomingMessage,
+  respuesta: ServerResponse,
+  id: string,
+): Promise<void> {
+  const sesion = await obtenerSesionActual(solicitud);
+
+  if (!sesion || sesion.rol !== "administrador") {
+    responderJson(respuesta, 403, { error: "Solo el administrador puede cambiar rasgos." });
+    return;
+  }
+
+  if (!esUuid(id)) {
+    responderJson(respuesta, 400, { error: "El identificador no es válido." });
+    return;
+  }
+
+  let contenido: { activo?: unknown };
+
+  try {
+    contenido = await leerJson(solicitud);
+  } catch {
+    responderJson(respuesta, 400, { error: "El contenido enviado no es válido." });
+    return;
+  }
+
+  if (typeof contenido.activo !== "boolean") {
+    responderJson(respuesta, 400, { error: "El estado del rasgo no es válido." });
+    return;
+  }
+
+  const actualizado = await actualizarEstadoRasgoComportamiento(id, contenido.activo);
+  responderJson(
+    respuesta,
+    actualizado ? 200 : 404,
+    actualizado ? { ok: true } : { error: "Rasgo no encontrado." },
+  );
+}
+
 async function manejarLoginDiscord(respuesta: ServerResponse): Promise<void> {
   const parametros = new URLSearchParams({
     client_id: configuracion.discordClientId(),
@@ -738,6 +819,11 @@ const servidor = createServer(async (solicitud, respuesta) => {
       return;
     }
 
+    if (solicitud.method === "POST" && ruta === "/api/traits") {
+      await manejarNuevoRasgo(solicitud, respuesta);
+      return;
+    }
+
     if (solicitud.method === "POST" && ruta === "/api/trainers") {
       await manejarNuevoEntrenador(solicitud, respuesta);
       return;
@@ -777,6 +863,13 @@ const servidor = createServer(async (solicitud, respuesta) => {
 
     if (solicitud.method === "PATCH" && coincidenciaEjemplo) {
       await manejarEstadoEjemplo(solicitud, respuesta, coincidenciaEjemplo[1]);
+      return;
+    }
+
+    const coincidenciaRasgo = ruta.match(/^\/api\/traits\/([^/]+)$/);
+
+    if (solicitud.method === "PATCH" && coincidenciaRasgo) {
+      await manejarEstadoRasgo(solicitud, respuesta, coincidenciaRasgo[1]);
       return;
     }
 

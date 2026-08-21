@@ -84,32 +84,50 @@
 
         <section class="panel" data-panel="entrenar">
           <div class="training-layout">
-            <form id="form-ejemplo" class="training-form">
-              <div class="field">
-                <label for="entrada">Mensaje que recibiría</label>
-                <textarea id="entrada" name="entrada" rows="5" maxlength="1000" required placeholder="Ejemplo: oe vas a entrar hoy"></textarea>
-                <span>Escribe como lo haría alguien en Discord.</span>
-              </div>
+            <div class="training-forms">
+              <form id="form-ejemplo" class="training-form">
+                <div class="field">
+                  <label for="entrada">Mensaje que recibiría</label>
+                  <textarea id="entrada" name="entrada" rows="5" maxlength="1000" required placeholder="Ejemplo: oe vas a entrar hoy"></textarea>
+                  <span>Escribe como lo haría alguien en Discord.</span>
+                </div>
 
-              <div class="field">
-                <label for="respuesta-ideal">Cómo debería responder</label>
-                <textarea id="respuesta-ideal" name="respuestaIdeal" rows="5" maxlength="2000" required placeholder="Ejemplo: ya voy oe dame chance"></textarea>
-                <span>Usa una respuesta realista, corta y natural.</span>
-              </div>
+                <div class="field">
+                  <label for="respuesta-ideal">Cómo debería responder</label>
+                  <textarea id="respuesta-ideal" name="respuestaIdeal" rows="5" maxlength="2000" required placeholder="Ejemplo: ya voy oe dame chance"></textarea>
+                  <span>Usa una respuesta realista, corta y natural.</span>
+                </div>
 
-              <div class="form-actions">
-                <button id="guardar-ejemplo" class="button button-accent" type="submit">Guardar ejemplo</button>
-                <span id="resultado-formulario" class="form-result" aria-live="polite"></span>
-              </div>
-            </form>
+                <div class="form-actions">
+                  <button id="guardar-ejemplo" class="button button-accent" type="submit">Guardar ejemplo</button>
+                  <span id="resultado-formulario" class="form-result" aria-live="polite"></span>
+                </div>
+              </form>
+
+              <form id="form-rasgo" class="trait-form">
+                <div class="field">
+                  <label for="rasgo">Rasgo de comportamiento</label>
+                  <textarea id="rasgo" name="contenido" rows="3" maxlength="500" required placeholder="Ejemplo: A Poke le gusta Lil Peep."></textarea>
+                  <span>Guarda gustos, temas o formas de actuar que ayuden a responder como Poke.</span>
+                </div>
+                <div class="form-actions">
+                  <button id="guardar-rasgo" class="button" type="submit">Guardar rasgo</button>
+                  <span id="resultado-rasgo" class="form-result" aria-live="polite"></span>
+                </div>
+              </form>
+            </div>
 
             <aside class="training-guide">
-              <h2>Un buen ejemplo</h2>
+              <h2>Entrena con criterio</h2>
               <ul>
                 <li>Representa una conversación real.</li>
                 <li>Mantiene palabras y errores habituales.</li>
-                <li>No incluye información privada.</li>
+                <li>Los rasgos deben ser ciertos y no incluir información privada.</li>
               </ul>
+              <section class="traits-panel" aria-labelledby="rasgos-titulo">
+                <h3 id="rasgos-titulo">Rasgos guardados</h3>
+                <div id="lista-rasgos" class="traits-list" aria-live="polite"></div>
+              </section>
             </aside>
           </div>
         </section>

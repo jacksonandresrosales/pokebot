@@ -74,6 +74,25 @@ create index if not exists ejemplos_estilo_creado_por_idx
   on ejemplos_estilo (creado_por, created_at desc)
   where creado_por is not null;
 
+create table if not exists rasgos_comportamiento (
+  id uuid primary key default gen_random_uuid(),
+  contenido text not null check (char_length(contenido) between 2 and 500),
+  activo boolean not null default true,
+  creado_por uuid references usuarios(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists rasgos_comportamiento_contenido_uq
+  on rasgos_comportamiento (digest(contenido, 'sha256'));
+
+create index if not exists rasgos_comportamiento_activo_idx
+  on rasgos_comportamiento (created_at desc)
+  where activo = true;
+
+create index if not exists rasgos_comportamiento_creado_por_idx
+  on rasgos_comportamiento (creado_por, created_at desc)
+  where creado_por is not null;
+
 create index if not exists feedback_created_at_idx
   on feedback (created_at desc);
 
@@ -138,5 +157,6 @@ create index if not exists propuestas_entrenamiento_ejemplo_id_idx
 alter table mensajes_bot enable row level security;
 alter table feedback enable row level security;
 alter table ejemplos_estilo enable row level security;
+alter table rasgos_comportamiento enable row level security;
 alter table importaciones_mensajes enable row level security;
 alter table propuestas_entrenamiento enable row level security;

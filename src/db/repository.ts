@@ -34,6 +34,15 @@ export interface EjemploPanel {
   createdAt: Date;
 }
 
+export interface RasgoComportamientoPanel {
+  id: string;
+  contenido: string;
+  activo: boolean;
+  creadoPor: string | null;
+  importancia: number;
+  createdAt: Date;
+}
+
 export interface PuntoFeedback {
   fecha: string;
   positivos: number;
@@ -191,6 +200,88 @@ export async function crearEjemploManual(
       returning id
     `,
     [entrada, respuestaIdeal, discordUserId],
+  );
+
+  return resultado.rowCount === 1;
+}
+
+export async function obtenerRasgosComportamiento(limite = 10): Promise<string[]> {
+  const limiteSeguro = Math.min(Math.max(Math.trunc(limite), 1), 20);
+  const resultado = await pool.query<{ contenido: string }>(
+    `
+      select rasgos_comportamiento.contenido
+      from rasgos_comportamiento
+      left join usuarios
+        on usuarios.id = rasgos_comportamiento.creado_por
+        and usuarios.puede_entrenar = true
+      where rasgos_comportamiento.activo = true
+      order by
+        coalesce(usuarios.importancia, 1) desc,
+        rasgos_comportamiento.created_at desc
+      limit $1
+    `,
+    [limiteSeguro],
+  );
+
+  return resultado.rows.map((fila) => fila.contenido);
+}
+
+export async function crearRasgoComportamiento(
+  contenido: string,
+  discordUserId: string,
+): Promise<boolean> {
+  const resultado = await pool.query(
+    `
+      insert into rasgos_comportamiento (contenido, creado_por)
+      select $1, usuarios.id
+      from usuarios
+      where usuarios.discord_user_id = $2
+        and usuarios.puede_entrenar = true
+      on conflict do nothing
+      returning id
+    `,
+    [contenido, discordUserId],
+  );
+
+  return resultado.rowCount === 1;
+}
+
+export async function listarRasgosComportamientoPanel(
+  limite = 30,
+): Promise<RasgoComportamientoPanel[]> {
+  const limiteSeguro = Math.min(Math.max(Math.trunc(limite), 1), 100);
+  const resultado = await pool.query<RasgoComportamientoPanel>(
+    `
+      select
+        rasgos_comportamiento.id,
+        rasgos_comportamiento.contenido,
+        rasgos_comportamiento.activo,
+        usuarios.nombre as "creadoPor",
+        coalesce(usuarios.importancia, 1)::int as importancia,
+        rasgos_comportamiento.created_at as "createdAt"
+      from rasgos_comportamiento
+      left join usuarios on usuarios.id = rasgos_comportamiento.creado_por
+      order by rasgos_comportamiento.created_at desc
+      limit $1
+    `,
+    [limiteSeguro],
+  );
+
+  return resultado.rows;
+}
+
+export async function actualizarEstadoRasgoComportamiento(
+  id: string,
+  activo: boolean,
+): Promise<boolean> {
+  const resultado = await pool.query(
+    `
+      update rasgos_comportamiento
+      set activo = $2
+      where id = $1
+      returning id
+    `,
+    [id, activo],
   );
 
   return resultado.rowCount === 1;

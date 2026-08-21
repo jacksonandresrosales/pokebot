@@ -306,7 +306,9 @@ body[data-health="error"] .health-dot { background: var(--error); }
   gap: clamp(3rem, 8vw, 7rem);
 }
 
+.training-forms { display: grid; gap: 2.5rem; }
 .training-form { display: grid; gap: 1.5rem; }
+.trait-form { display: grid; gap: 1.25rem; padding-top: 2rem; border-top: 1px solid var(--line); }
 
 .field { display: grid; gap: 0.55rem; }
 .field label, .search-field span { font-size: 0.8rem; font-weight: 650; }
@@ -341,6 +343,16 @@ textarea:focus-visible, input:focus-visible, select:focus-visible { border-color
 .training-guide { padding-top: 0.1rem; }
 .training-guide ul { display: grid; gap: 0.85rem; margin: 1.25rem 0 0; padding: 0; list-style: none; }
 .training-guide li { padding-top: 0.85rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.78rem; line-height: 1.5; }
+.traits-panel { margin-top: 2.5rem; padding-top: 1.1rem; border-top: 1px solid var(--line); }
+.traits-panel h3 { margin: 0; font-size: 0.78rem; }
+.traits-list { margin-top: 0.8rem; }
+.trait-row { display: grid; gap: 0.55rem; padding: 0.85rem 0; border-bottom: 1px solid var(--line); }
+.trait-row p { margin: 0; color: var(--muted); font-size: 0.76rem; line-height: 1.5; overflow-wrap: anywhere; }
+.trait-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; color: var(--subtle); font-size: 0.65rem; }
+.trait-meta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trait-actions { display: flex; align-items: center; gap: 0.5rem; }
+.trait-actions .example-action { flex: 0 0 auto; }
+.traits-empty { color: var(--subtle); font-size: 0.72rem; line-height: 1.5; }
 
 .panel-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; }
 .search-field { display: grid; width: min(360px, 100%); gap: 0.5rem; }

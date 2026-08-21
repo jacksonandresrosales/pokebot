@@ -3,6 +3,7 @@
 Panel minimalista para entrenar y supervisar el estilo del bot. Incluye:
 
 - creación y administración de ejemplos;
+- rasgos de comportamiento para añadir gustos, temas y manías de Poke;
 - métricas de votos y actividad de los últimos siete días;
 - listado de amigos autorizados para entrenarlo.
 - gestión de roles, accesos e importancia de cada entrenador.

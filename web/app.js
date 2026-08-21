@@ -5,6 +5,9 @@ const alertaGlobal = document.querySelector("#alerta-global");
 const formulario = document.querySelector("#form-ejemplo");
 const botonGuardar = document.querySelector("#guardar-ejemplo");
 const resultadoFormulario = document.querySelector("#resultado-formulario");
+const formularioRasgo = document.querySelector("#form-rasgo");
+const botonGuardarRasgo = document.querySelector("#guardar-rasgo");
+const resultadoRasgo = document.querySelector("#resultado-rasgo");
 const buscador = document.querySelector("#buscar-ejemplo");
 const formularioEntrenador = document.querySelector("#form-entrenador");
 const botonGuardarEntrenador = document.querySelector("#guardar-entrenador");
@@ -211,6 +214,46 @@ function renderEjemplos() {
     }
 
     fila.append(entrada, respuesta, acciones);
+    contenedor.append(fila);
+  }
+}
+
+function renderRasgos() {
+  const contenedor = document.querySelector("#lista-rasgos");
+  const rasgos = estadoApp.datos?.rasgos ?? [];
+  contenedor.replaceChildren();
+
+  if (rasgos.length === 0) {
+    contenedor.append(crearElemento("p", "traits-empty", "Todavía no hay rasgos guardados."));
+    return;
+  }
+
+  for (const rasgo of rasgos) {
+    const fila = crearElemento("article", "trait-row");
+    const meta = crearElemento("div", "trait-meta");
+    const detalles = [
+      rasgo.creadoPor ?? "Entrenador desconocido",
+      `Peso ${rasgo.importancia}`,
+      fechaCorta(rasgo.createdAt),
+    ].join(" · ");
+    meta.append(crearElemento("span", "", detalles));
+
+    const acciones = crearElemento("div", "trait-actions");
+    acciones.append(crearElemento(
+      "span",
+      `status-badge${rasgo.activo ? "" : " is-paused"}`,
+      rasgo.activo ? "Activo" : "Pausado",
+    ));
+
+    if (estadoApp.usuario.rol === "administrador") {
+      const boton = crearElemento("button", "example-action", rasgo.activo ? "Pausar" : "Activar");
+      boton.type = "button";
+      boton.addEventListener("click", () => cambiarEstadoRasgo(rasgo, boton));
+      acciones.append(boton);
+    }
+
+    meta.append(acciones);
+    fila.append(crearElemento("p", "", rasgo.contenido), meta);
     contenedor.append(fila);
   }
 }
@@ -518,6 +561,7 @@ function renderPropuestas() {
 
 function renderTodo() {
   renderEjemplos();
+  renderRasgos();
   renderAnaliticas();
   renderGestionEntrenadores();
   if (estadoApp.usuario.rol === "administrador") {
@@ -554,6 +598,21 @@ async function cambiarEstadoEjemplo(ejemplo, boton) {
   }
 }
 
+async function cambiarEstadoRasgo(rasgo, boton) {
+  boton.disabled = true;
+  try {
+    await solicitar(`/api/traits/${rasgo.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ activo: !rasgo.activo }),
+    });
+    await cargarDashboard();
+  } catch (error) {
+    mostrarAlerta(error.message);
+  } finally {
+    boton.disabled = false;
+  }
+}
+
 formulario.addEventListener("submit", async (evento) => {
   evento.preventDefault();
   botonGuardar.disabled = true;
@@ -581,6 +640,33 @@ formulario.addEventListener("submit", async (evento) => {
   } finally {
     botonGuardar.disabled = false;
     botonGuardar.textContent = "Guardar ejemplo";
+  }
+});
+
+formularioRasgo.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  botonGuardarRasgo.disabled = true;
+  botonGuardarRasgo.textContent = "Guardando...";
+  resultadoRasgo.textContent = "";
+  resultadoRasgo.className = "form-result";
+
+  const datos = new FormData(formularioRasgo);
+
+  try {
+    await solicitar("/api/traits", {
+      method: "POST",
+      body: JSON.stringify({ contenido: datos.get("contenido") }),
+    });
+    formularioRasgo.reset();
+    resultadoRasgo.textContent = "Rasgo guardado.";
+    resultadoRasgo.classList.add("is-success");
+    await cargarDashboard();
+  } catch (error) {
+    resultadoRasgo.textContent = error.message;
+    resultadoRasgo.classList.add("is-error");
+  } finally {
+    botonGuardarRasgo.disabled = false;
+    botonGuardarRasgo.textContent = "Guardar rasgo";
   }
 });
 

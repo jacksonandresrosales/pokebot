@@ -18,6 +18,7 @@ async function main(): Promise<void> {
           'mensajes_bot',
           'feedback',
           'ejemplos_estilo',
+          'rasgos_comportamiento',
           'importaciones_mensajes',
           'propuestas_entrenamiento'
         )
