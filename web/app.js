@@ -131,16 +131,32 @@ function iniciarTutorial() {
   botonTutorialSiguiente.focus();
 }
 
-function avanzarTutorial(direccion) {
+function cerrarTutorial() {
+  tutorial.hidden = true;
+  dashboard.inert = false;
+  document.body.classList.remove("is-tutorial-active");
+  seleccionarTab("entrenar");
+  document.querySelector('[data-tab="entrenar"]').focus();
+}
+
+async function avanzarTutorial(direccion) {
   const siguientePaso = estadoApp.pasoTutorial + direccion;
   if (siguientePaso < 0) return;
 
   if (siguientePaso >= estadoApp.pasosTutorial.length) {
-    tutorial.hidden = true;
-    dashboard.inert = false;
-    document.body.classList.remove("is-tutorial-active");
-    seleccionarTab("entrenar");
-    document.querySelector('[data-tab="entrenar"]').focus();
+    botonTutorialSiguiente.disabled = true;
+    botonTutorialSiguiente.textContent = "Guardando...";
+
+    try {
+      await solicitar("/api/onboarding/complete", { method: "POST" });
+      estadoApp.datos.tutorialCompletado = true;
+      cerrarTutorial();
+    } catch (error) {
+      mostrarAlerta("No se pudo guardar el tutorial. Inténtalo de nuevo.");
+      botonTutorialSiguiente.textContent = "Empezar";
+    } finally {
+      botonTutorialSiguiente.disabled = false;
+    }
     return;
   }
 
@@ -780,7 +796,7 @@ async function iniciar() {
     dashboard.hidden = false;
     dashboard.inert = true;
     const panelListo = await cargarDashboard();
-    if (panelListo) {
+    if (panelListo && !estadoApp.datos.tutorialCompletado) {
       iniciarTutorial();
     } else {
       dashboard.inert = false;

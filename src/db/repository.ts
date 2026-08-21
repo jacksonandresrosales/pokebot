@@ -178,6 +178,38 @@ export async function obtenerUsuarioPorDiscordId(
   return resultado.rows[0] ?? null;
 }
 
+export async function obtenerTutorialCompletado(
+  discordUserId: string,
+): Promise<boolean> {
+  const resultado = await pool.query<{ tutorialCompletado: boolean }>(
+    `
+      select tutorial_completado_at is not null as "tutorialCompletado"
+      from usuarios
+      where discord_user_id = $1
+      limit 1
+    `,
+    [discordUserId],
+  );
+
+  return resultado.rows[0]?.tutorialCompletado ?? false;
+}
+
+export async function marcarTutorialCompletado(
+  discordUserId: string,
+): Promise<boolean> {
+  const resultado = await pool.query(
+    `
+      update usuarios
+      set tutorial_completado_at = coalesce(tutorial_completado_at, now())
+      where discord_user_id = $1
+      returning id
+    `,
+    [discordUserId],
+  );
+
+  return resultado.rowCount === 1;
+}
+
 export async function crearEjemploManual(
   entrada: string,
   respuestaIdeal: string,

@@ -146,6 +146,25 @@ try {
     rol: "entrenador",
     puedeEntrenar: true,
   });
+  const completarTutorial = await fetch(
+    `${configuracion.webUrl()}/api/onboarding/complete`,
+    { method: "POST", headers: { Cookie: cookieEntrenador } },
+  );
+
+  if (!completarTutorial.ok) {
+    throw new Error(`El tutorial respondió con estado ${completarTutorial.status}.`);
+  }
+
+  const panelEntrenador = await fetch(`${configuracion.webUrl()}/api/dashboard`, {
+    headers: { Cookie: cookieEntrenador },
+  });
+  const datosEntrenador = (await panelEntrenador.json()) as {
+    tutorialCompletado: boolean;
+  };
+
+  if (!datosEntrenador.tutorialCompletado) {
+    throw new Error("El panel no guardó el tutorial completado del entrenador.");
+  }
   const intentoSinPermiso = await fetch(
     `${configuracion.webUrl()}/api/trainers/${entrenadorCreado.entrenador.id}`,
     {
@@ -291,6 +310,7 @@ try {
         )
       ).rows[0]?.activo === false,
       entrenadorCreado: nuevoEntrenador.status === 201,
+      tutorialCompletado: datosEntrenador.tutorialCompletado,
       entrenadorRestringido: intentoSinPermiso.status === 403,
       administradorSecundario: cambioComoAdministrador.ok,
       importanciaActualizada: (

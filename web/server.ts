@@ -29,7 +29,9 @@ import {
   listarPropuestasEntrenamiento,
   marcarErrorAnalisisImportacion,
   obtenerAnaliticasEntrenamiento,
+  obtenerTutorialCompletado,
   obtenerUsuarioPorDiscordId,
+  marcarTutorialCompletado,
   registrarUsuario,
 } from "../src/db/repository.js";
 import type { UsuarioEntrenador } from "../src/types/index.js";
@@ -188,13 +190,14 @@ async function manejarDashboard(
   }
 
   const esAdministrador = sesion.rol === "administrador";
-  const [ejemplos, rasgos, analiticas, entrenadores, importaciones, propuestas] = await Promise.all([
+  const [ejemplos, rasgos, analiticas, entrenadores, importaciones, propuestas, tutorialCompletado] = await Promise.all([
     listarEjemplosPanel(),
     listarRasgosComportamientoPanel(),
     obtenerAnaliticasEntrenamiento(),
     listarEntrenadores(),
     esAdministrador ? listarImportacionesMensajes() : Promise.resolve([]),
     esAdministrador ? listarPropuestasEntrenamiento() : Promise.resolve([]),
+    obtenerTutorialCompletado(sesion.discordUserId),
   ]);
 
   const entrenadoresVisibles = esAdministrador
@@ -213,7 +216,27 @@ async function manejarDashboard(
     entrenadores: entrenadoresVisibles,
     importaciones,
     propuestas,
+    tutorialCompletado,
   });
+}
+
+async function manejarCompletarTutorial(
+  solicitud: IncomingMessage,
+  respuesta: ServerResponse,
+): Promise<void> {
+  const sesion = await obtenerSesionActual(solicitud);
+
+  if (!sesion) {
+    responderJson(respuesta, 401, { error: "Debes iniciar sesión." });
+    return;
+  }
+
+  const actualizado = await marcarTutorialCompletado(sesion.discordUserId);
+  responderJson(
+    respuesta,
+    actualizado ? 200 : 404,
+    actualizado ? { ok: true } : { error: "Usuario no encontrado." },
+  );
 }
 
 function esFormatoMensajes(valor: unknown): valor is "txt" | "json" | "csv" {
@@ -811,6 +834,11 @@ const servidor = createServer(async (solicitud, respuesta) => {
 
     if (solicitud.method === "GET" && ruta === "/api/dashboard") {
       await manejarDashboard(solicitud, respuesta);
+      return;
+    }
+
+    if (solicitud.method === "POST" && ruta === "/api/onboarding/complete") {
+      await manejarCompletarTutorial(solicitud, respuesta);
       return;
     }
 

@@ -12,6 +12,7 @@ create table if not exists usuarios (
   importancia smallint not null default 3
     check (importancia between 1 and 5),
   consentimiento boolean not null default false,
+  tutorial_completado_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -21,6 +22,9 @@ create index if not exists usuarios_rol_idx
 alter table usuarios
   add column if not exists importancia smallint not null default 3
     check (importancia between 1 and 5);
+
+alter table usuarios
+  add column if not exists tutorial_completado_at timestamptz;
 
 alter table usuarios enable row level security;
 
