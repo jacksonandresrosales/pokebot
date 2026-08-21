@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Archivos generados
+coverage/
+.vscode/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

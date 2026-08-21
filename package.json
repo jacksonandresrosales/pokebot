@@ -1,0 +1,23 @@
+{
+  "name": "pokebot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bot de Discord inspirado en el estilo de escritura de una persona real.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "latest",
+    "discord.js": "latest",
+    "dotenv": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}
