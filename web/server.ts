@@ -374,6 +374,16 @@ async function servirScript(respuesta: ServerResponse): Promise<void> {
   respuesta.end(script);
 }
 
+async function servirLogo(respuesta: ServerResponse): Promise<void> {
+  const logo = await readFile(resolve(directorioWeb, "assets", "pokebot.jpg"));
+  respuesta.writeHead(200, {
+    "Content-Type": "image/jpeg",
+    "Cache-Control": "public, max-age=86400",
+    "X-Content-Type-Options": "nosniff",
+  });
+  respuesta.end(logo);
+}
+
 const servidor = createServer(async (solicitud, respuesta) => {
   try {
     const ruta = new URL(solicitud.url ?? "/", configuracion.webUrl()).pathname;
@@ -390,6 +400,11 @@ const servidor = createServer(async (solicitud, respuesta) => {
 
     if (solicitud.method === "GET" && ruta === "/app.js") {
       await servirScript(respuesta);
+      return;
+    }
+
+    if (solicitud.method === "GET" && ruta === "/assets/pokebot.jpg") {
+      await servirLogo(respuesta);
       return;
     }
 

@@ -61,7 +61,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   letter-spacing: -0.01em;
 }
 
-.brand-mark, .user-avatar {
+.user-avatar {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -71,11 +71,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
   font-weight: 800;
 }
 
-.brand-mark {
+.brand-logo {
+  display: block;
+  flex: 0 0 auto;
   width: 2.25rem;
   height: 2.25rem;
+  border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 8px;
-  font-size: 0.68rem;
+  object-fit: cover;
+  object-position: 50% 42%;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
 }
 
 .identity h1 {
