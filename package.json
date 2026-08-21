@@ -8,15 +8,18 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:setup": "tsx scripts/aplicar-esquema.ts"
   },
   "dependencies": {
     "@google/genai": "latest",
     "discord.js": "latest",
-    "dotenv": "latest"
+    "dotenv": "latest",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "@types/pg": "^8.23.1",
     "tsx": "latest",
     "typescript": "latest"
   }

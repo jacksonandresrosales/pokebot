@@ -1,11 +1,12 @@
 import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 
-import { generarRespuesta } from "../ai/gemini.js";
+import { generarRespuesta, obtenerModeloUsado } from "../ai/gemini.js";
 import { configuracion } from "../config/env.js";
+import { verificarConexion } from "../db/client.js";
+import { guardarMensajeBot, registrarFeedback } from "../db/repository.js";
 import {
   crearBotonesDeFeedback,
   obtenerVotoDesdeBoton,
-  registrarVotoTemporal,
 } from "./feedback.js";
 
 export async function iniciarBot(): Promise<void> {
@@ -38,10 +39,22 @@ export async function iniciarBot(): Promise<void> {
     try {
       await mensaje.channel.sendTyping();
       const respuesta = await generarRespuesta(texto);
-      await mensaje.reply({
+      const mensajeBot = await mensaje.reply({
         content: respuesta,
         components: [crearBotonesDeFeedback()],
       });
+
+      try {
+        await guardarMensajeBot({
+          discordMessageId: mensajeBot.id,
+          discordUserId: mensaje.author.id,
+          mensajeUsuario: texto,
+          respuestaBot: respuesta,
+          modeloUsado: obtenerModeloUsado(),
+        });
+      } catch (error) {
+        console.error("No se pudo guardar la respuesta en Supabase:", error);
+      }
     } catch (error) {
       console.error("Error al generar la respuesta:", error);
       await mensaje.reply("Ocurrió un error al generar la respuesta.");
@@ -59,31 +72,54 @@ export async function iniciarBot(): Promise<void> {
       return;
     }
 
-    const resultado = registrarVotoTemporal(
+    try {
+      const resultado = await registrarFeedback(
       interaccion.message.id,
       interaccion.user.id,
       voto,
-    );
+      );
 
-    if (!resultado.aceptado) {
-      await interaccion.reply({
-        content: "Ya registraste un voto para esta respuesta.",
+      if (!resultado.encontrado) {
+        await interaccion.reply({
+          content: "No encontré esta respuesta en la base de datos.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      if (!resultado.aceptado) {
+        await interaccion.reply({
+          content: "Ya registraste un voto para esta respuesta.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      await interaccion.update({
+        components: [
+          crearBotonesDeFeedback({
+            positivos: resultado.positivos,
+            negativos: resultado.negativos,
+          }),
+        ],
+      });
+      await interaccion.followUp({
+        content:
+          voto === "positivo"
+            ? "Gracias. Esta respuesta se marcará como un buen ejemplo."
+            : "Gracias. Tendremos en cuenta que esta respuesta necesita mejorar.",
         flags: MessageFlags.Ephemeral,
       });
-      return;
+    } catch (error) {
+      console.error("No se pudo registrar el feedback:", error);
+      await interaccion.reply({
+        content: "No pude guardar tu voto en este momento.",
+        flags: MessageFlags.Ephemeral,
+      });
     }
-
-    await interaccion.update({
-      components: [crearBotonesDeFeedback(resultado.conteo)],
-    });
-    await interaccion.followUp({
-      content:
-        voto === "positivo"
-          ? "Gracias. Esta respuesta se marcará como un buen ejemplo."
-          : "Gracias. Tendremos en cuenta que esta respuesta necesita mejorar.",
-      flags: MessageFlags.Ephemeral,
-    });
   });
 
+  await verificarConexion();
+  console.log("Base de datos conectada correctamente");
   await cliente.login(configuracion.discordToken());
 }

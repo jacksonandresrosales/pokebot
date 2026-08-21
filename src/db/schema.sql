@@ -1,13 +1,19 @@
 -- Esquema inicial para mensajes, feedback y ejemplos aprobados.
 
+create extension if not exists pgcrypto;
+
 create table if not exists mensajes_bot (
   id uuid primary key default gen_random_uuid(),
   discord_message_id text not null unique,
   discord_user_id text not null,
   mensaje_usuario text not null,
   respuesta_bot text not null,
+  modelo_usado text not null,
   created_at timestamptz not null default now()
 );
+
+alter table mensajes_bot
+  add column if not exists modelo_usado text not null default 'desconocido';
 
 create table if not exists feedback (
   id uuid primary key default gen_random_uuid(),
@@ -26,3 +32,11 @@ create table if not exists ejemplos_estilo (
   aprobado boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+create index if not exists ejemplos_estilo_aprobado_idx
+  on ejemplos_estilo (created_at desc)
+  where aprobado = true;
+
+alter table mensajes_bot enable row level security;
+alter table feedback enable row level security;
+alter table ejemplos_estilo enable row level security;

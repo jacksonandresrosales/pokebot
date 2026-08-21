@@ -15,3 +15,7 @@ export async function generarRespuesta(mensaje: string): Promise<string> {
 
   return respuesta.text?.trim() || "No pude generar una respuesta.";
 }
+
+export function obtenerModeloUsado(): string {
+  return configuracion.geminiModel();
+}

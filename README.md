@@ -34,6 +34,8 @@ tests/              Pruebas automatizadas
 npm install
 copy .env.example .env
 npm run typecheck
+npm run db:setup
 ```
 
-Antes de ejecutar el bot, completa las variables de `.env`.
+Antes de ejecutar el bot, completa las variables de `.env`. `npm run db:setup`
+aplica el esquema de Supabase y verifica sus tablas.
