@@ -2,6 +2,10 @@
 
 Bot de Discord inspirado en el estilo de escritura de una persona real.
 
+Actualmente responde cuando lo mencionan y añade botones 👍/👎 para recopilar
+feedback. Los votos se guardan temporalmente en memoria hasta conectar la base
+de datos.
+
 ## Estructura
 
 ```text
