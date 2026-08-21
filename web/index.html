@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Panel de entrenamiento de PokeBot" />
+    <title>PokeBot · Entrenamiento</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro" aria-labelledby="titulo">
+        <p class="brand">POKEBOT</p>
+        <h1 id="titulo">Enseñémosle a hablar como Poke.</h1>
+        <p class="lead">
+          Un espacio privado para que los amigos aporten ejemplos, revisen
+          respuestas y mejoren el estilo del bot poco a poco.
+        </p>
+        <div class="status-line" aria-live="polite">
+          <span class="status-dot"></span>
+          <span id="estado">Comprobando conexión…</span>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="acceso-titulo">
+        <div class="panel-mark">✦</div>
+        <h2 id="acceso-titulo">Acceso de entrenadores</h2>
+        <p>Inicia sesión con Discord para entrar al panel de entrenamiento.</p>
+        <a class="button button-primary" href="/api/auth/discord">
+          Continuar con Discord
+          <span aria-hidden="true">↗</span>
+        </a>
+        <p class="fine-print">
+          El acceso se gestiona mediante Discord. No compartimos tu contraseña.
+        </p>
+        <div id="sesion" class="session" hidden></div>
+      </section>
+    </main>
+    <script>
+      const estado = document.querySelector("#estado");
+      const sesion = document.querySelector("#sesion");
+
+      fetch("/api/health")
+        .then((respuesta) => {
+          estado.textContent = respuesta.ok ? "Sistema operativo" : "Sistema con incidencias";
+        })
+        .catch(() => {
+          estado.textContent = "Servidor no disponible";
+        });
+
+      fetch("/api/me")
+        .then((respuesta) => respuesta.json())
+        .then(({ usuario }) => {
+          if (!usuario) return;
+          sesion.hidden = false;
+          sesion.innerHTML = `<strong>Sesión activa</strong><span>${usuario.nombre}</span>`;
+        });
+    </script>
+  </body>
+</html>

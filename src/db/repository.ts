@@ -1,7 +1,11 @@
 import { pool } from "./client.js";
 
-import type { Voto } from "../types/index.js";
-import type { EjemploDeEstilo } from "../types/index.js";
+import { configuracion } from "../config/env.js";
+import type {
+  EjemploDeEstilo,
+  UsuarioEntrenador,
+  Voto,
+} from "../types/index.js";
 
 interface NuevoMensajeBot {
   discordMessageId: string;
@@ -56,6 +60,40 @@ export async function guardarMensajeBot(mensaje: NuevoMensajeBot): Promise<void>
       mensaje.modeloUsado,
     ],
   );
+}
+
+export async function registrarUsuario(
+  discordUserId: string,
+  nombre: string,
+): Promise<UsuarioEntrenador> {
+  const esAdministrador = discordUserId === configuracion.adminDiscordId();
+  const resultado = await pool.query<UsuarioEntrenador>(
+    `
+      insert into usuarios (
+        discord_user_id,
+        nombre,
+        rol,
+        puede_entrenar
+      ) values ($1, $2, $3, true)
+      on conflict (discord_user_id) do update set
+        nombre = excluded.nombre,
+        rol = case
+          when usuarios.rol = 'administrador' then usuarios.rol
+          when excluded.rol = 'administrador' then excluded.rol
+          else usuarios.rol
+        end
+      returning
+        id,
+        discord_user_id as "discordUserId",
+        nombre,
+        rol,
+        puede_entrenar as "puedeEntrenar",
+        consentimiento
+    `,
+    [discordUserId, nombre, esAdministrador ? "administrador" : "entrenador"],
+  );
+
+  return resultado.rows[0];
 }
 
 export async function registrarFeedback(
