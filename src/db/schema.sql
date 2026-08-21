@@ -47,11 +47,15 @@ create table if not exists ejemplos_estilo (
   respuesta_ideal text not null,
   origen text not null default 'feedback',
   aprobado boolean not null default false,
+  creado_por uuid references usuarios(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
 alter table ejemplos_estilo
   add column if not exists origen text not null default 'feedback';
+
+alter table ejemplos_estilo
+  add column if not exists creado_por uuid references usuarios(id) on delete set null;
 
 create unique index if not exists ejemplos_estilo_contenido_uq
   on ejemplos_estilo (digest(entrada || chr(31) || respuesta_ideal, 'sha256'));
@@ -59,6 +63,13 @@ create unique index if not exists ejemplos_estilo_contenido_uq
 create index if not exists ejemplos_estilo_aprobado_idx
   on ejemplos_estilo (created_at desc)
   where aprobado = true;
+
+create index if not exists ejemplos_estilo_creado_por_idx
+  on ejemplos_estilo (creado_por, created_at desc)
+  where creado_por is not null;
+
+create index if not exists feedback_created_at_idx
+  on feedback (created_at desc);
 
 alter table mensajes_bot enable row level security;
 alter table feedback enable row level security;

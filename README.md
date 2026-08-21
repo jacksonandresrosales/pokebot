@@ -17,7 +17,7 @@ src/
 ├─ types/           Tipos compartidos
 └─ index.ts         Punto de entrada
 
-web/                Futura aplicación web de administración
+web/                Panel web de entrenamiento y analíticas
 scripts/            Scripts de mantenimiento y entrenamiento
 tests/              Pruebas automatizadas
 ```
@@ -39,3 +39,6 @@ npm run db:setup
 
 Antes de ejecutar el bot, completa las variables de `.env`. `npm run db:setup`
 aplica el esquema de Supabase y verifica sus tablas.
+
+Para abrir el panel web, ejecuta `npm run web:dev` y visita
+`http://localhost:3000`.

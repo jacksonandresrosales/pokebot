@@ -10,7 +10,9 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "db:setup": "tsx scripts/aplicar-esquema.ts",
+    "db:verify-panel": "tsx scripts/verificar-panel.ts",
     "web:dev": "tsx web/server.ts",
+    "web:verify-panel": "tsx scripts/verificar-api-panel.ts",
     "web:start": "node dist/web/server.js"
   },
   "dependencies": {

@@ -22,6 +22,39 @@ interface ResultadoFeedback {
   negativos: number;
 }
 
+export interface EjemploPanel {
+  id: string;
+  entrada: string;
+  respuestaIdeal: string;
+  origen: string;
+  aprobado: boolean;
+  creadoPor: string | null;
+  createdAt: Date;
+}
+
+export interface PuntoFeedback {
+  fecha: string;
+  positivos: number;
+  negativos: number;
+}
+
+export interface AnaliticasEntrenamiento {
+  mensajes: number;
+  positivos: number;
+  negativos: number;
+  ejemplosAprobados: number;
+  ejemplosManuales: number;
+  entrenadores: number;
+  tendencia: PuntoFeedback[];
+}
+
+export interface EntrenadorPanel {
+  nombre: string;
+  rol: UsuarioEntrenador["rol"];
+  puedeEntrenar: boolean;
+  consentimiento: boolean;
+}
+
 export async function obtenerEjemplosEstilo(
   limite = 5,
 ): Promise<EjemploDeEstilo[]> {
@@ -60,6 +93,164 @@ export async function guardarMensajeBot(mensaje: NuevoMensajeBot): Promise<void>
       mensaje.modeloUsado,
     ],
   );
+}
+
+export async function obtenerUsuarioPorDiscordId(
+  discordUserId: string,
+): Promise<UsuarioEntrenador | null> {
+  const resultado = await pool.query<UsuarioEntrenador>(
+    `
+      select
+        id,
+        discord_user_id as "discordUserId",
+        nombre,
+        rol,
+        puede_entrenar as "puedeEntrenar",
+        consentimiento
+      from usuarios
+      where discord_user_id = $1
+      limit 1
+    `,
+    [discordUserId],
+  );
+
+  return resultado.rows[0] ?? null;
+}
+
+export async function crearEjemploManual(
+  entrada: string,
+  respuestaIdeal: string,
+  discordUserId: string,
+): Promise<boolean> {
+  const resultado = await pool.query(
+    `
+      insert into ejemplos_estilo (
+        entrada,
+        respuesta_ideal,
+        origen,
+        aprobado,
+        creado_por
+      )
+      select $1, $2, 'manual', true, usuarios.id
+      from usuarios
+      where discord_user_id = $3
+        and puede_entrenar = true
+      on conflict do nothing
+      returning id
+    `,
+    [entrada, respuestaIdeal, discordUserId],
+  );
+
+  return resultado.rowCount === 1;
+}
+
+export async function listarEjemplosPanel(limite = 50): Promise<EjemploPanel[]> {
+  const limiteSeguro = Math.min(Math.max(Math.trunc(limite), 1), 100);
+  const resultado = await pool.query<EjemploPanel>(
+    `
+      select
+        ejemplos_estilo.id,
+        ejemplos_estilo.entrada,
+        ejemplos_estilo.respuesta_ideal as "respuestaIdeal",
+        ejemplos_estilo.origen,
+        ejemplos_estilo.aprobado,
+        usuarios.nombre as "creadoPor",
+        ejemplos_estilo.created_at as "createdAt"
+      from ejemplos_estilo
+      left join usuarios on usuarios.id = ejemplos_estilo.creado_por
+      order by ejemplos_estilo.created_at desc
+      limit $1
+    `,
+    [limiteSeguro],
+  );
+
+  return resultado.rows;
+}
+
+export async function actualizarAprobacionEjemplo(
+  id: string,
+  aprobado: boolean,
+): Promise<boolean> {
+  const resultado = await pool.query(
+    `
+      update ejemplos_estilo
+      set aprobado = $2
+      where id = $1
+      returning id
+    `,
+    [id, aprobado],
+  );
+
+  return resultado.rowCount === 1;
+}
+
+export async function obtenerAnaliticasEntrenamiento(): Promise<AnaliticasEntrenamiento> {
+  const [resumen, tendencia] = await Promise.all([
+    pool.query<Omit<AnaliticasEntrenamiento, "tendencia">>(
+      `
+        select
+          (select count(*)::int from mensajes_bot) as mensajes,
+          (select count(*)::int from feedback where voto = 'positivo') as positivos,
+          (select count(*)::int from feedback where voto = 'negativo') as negativos,
+          (
+            select count(*)::int
+            from ejemplos_estilo
+            where aprobado = true
+          ) as "ejemplosAprobados",
+          (
+            select count(*)::int
+            from ejemplos_estilo
+            where origen = 'manual'
+          ) as "ejemplosManuales",
+          (
+            select count(*)::int
+            from usuarios
+            where puede_entrenar = true
+          ) as entrenadores
+      `,
+    ),
+    pool.query<PuntoFeedback>(
+      `
+        select
+          to_char(dia, 'YYYY-MM-DD') as fecha,
+          count(feedback.id) filter (where feedback.voto = 'positivo')::int as positivos,
+          count(feedback.id) filter (where feedback.voto = 'negativo')::int as negativos
+        from generate_series(
+          current_date - interval '6 days',
+          current_date,
+          interval '1 day'
+        ) as dia
+        left join feedback
+          on feedback.created_at >= dia
+          and feedback.created_at < dia + interval '1 day'
+        group by dia
+        order by dia
+      `,
+    ),
+  ]);
+
+  return {
+    ...resumen.rows[0],
+    tendencia: tendencia.rows,
+  };
+}
+
+export async function listarEntrenadores(): Promise<EntrenadorPanel[]> {
+  const resultado = await pool.query<EntrenadorPanel>(
+    `
+      select
+        nombre,
+        rol,
+        puede_entrenar as "puedeEntrenar",
+        consentimiento
+      from usuarios
+      order by
+        case when rol = 'administrador' then 0 else 1 end,
+        nombre asc
+    `,
+  );
+
+  return resultado.rows;
 }
 
 export async function registrarUsuario(

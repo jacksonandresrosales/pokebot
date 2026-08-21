@@ -1,6 +1,11 @@
 # Aplicación web
 
-Panel minimalista para revisar mensajes, feedback, ejemplos de estilo y entrenamientos.
+Panel minimalista para entrenar y supervisar el estilo del bot. Incluye:
+
+- creación y administración de ejemplos;
+- métricas de votos y actividad de los últimos siete días;
+- configuración visible del comportamiento del bot;
+- listado de amigos autorizados para entrenarlo.
 
 ## Ejecutar
 
@@ -24,4 +29,14 @@ Luego ejecuta:
 
 ```bash
 npm run web:dev
+```
+
+## Verificación
+
+Con el servidor web activo, puedes comprobar el panel y su conexión con la
+base de datos mediante:
+
+```bash
+npm run db:verify-panel
+npm run web:verify-panel
 ```

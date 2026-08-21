@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Acceso privado a PokeBot" />
+    <meta name="description" content="Panel privado de entrenamiento de PokeBot" />
     <title>PokeBot</title>
     <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
   </head>
   <body>
     <div class="ambient" aria-hidden="true"></div>
 
-    <main class="page">
+    <main id="landing" class="landing">
       <section class="identity" aria-labelledby="titulo">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true">PB</span>
@@ -20,31 +21,12 @@
       </section>
 
       <section class="auth" aria-labelledby="acceso-titulo">
-        <div id="acceso">
-          <h2 id="acceso-titulo">Acceso privado</h2>
-          <a class="button button-primary" href="/api/auth/discord">
-            <span>Continuar con Discord</span>
-            <span aria-hidden="true">→</span>
-          </a>
-          <p>Solo para amigos autorizados.</p>
-        </div>
-
-        <div id="sesion" class="session" hidden>
-          <div class="session-user">
-            <span class="session-avatar" aria-hidden="true">
-              <img id="sesion-imagen" class="session-image" alt="" hidden />
-              <span id="sesion-inicial">U</span>
-            </span>
-            <div class="session-copy">
-              <span>Sesión iniciada</span>
-              <strong id="sesion-nombre"></strong>
-            </div>
-          </div>
-          <form action="/api/auth/logout" method="post">
-            <button class="button button-secondary" type="submit">Cerrar sesión</button>
-          </form>
-        </div>
-
+        <h2 id="acceso-titulo">Acceso privado</h2>
+        <a class="button button-primary" href="/api/auth/discord">
+          <span>Continuar con Discord</span>
+          <span aria-hidden="true">→</span>
+        </a>
+        <p>Solo para amigos autorizados.</p>
         <div class="health" aria-live="polite">
           <span class="health-dot" aria-hidden="true"></span>
           <span id="estado">Comprobando conexión...</span>
@@ -52,46 +34,143 @@
       </section>
     </main>
 
-    <script>
-      const estado = document.querySelector("#estado");
-      const acceso = document.querySelector("#acceso");
-      const sesion = document.querySelector("#sesion");
-      const sesionNombre = document.querySelector("#sesion-nombre");
-      const sesionImagen = document.querySelector("#sesion-imagen");
-      const sesionInicial = document.querySelector("#sesion-inicial");
+    <div id="dashboard" class="dashboard" hidden>
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <span class="brand-mark" aria-hidden="true">PB</span>
+          <div>
+            <strong>PokeBot</strong>
+            <span>Entrenamiento</span>
+          </div>
+        </div>
 
-      fetch("/api/health")
-        .then((respuesta) => {
-          estado.textContent = respuesta.ok ? "PokeBot disponible" : "PokeBot no disponible";
-          document.body.dataset.health = respuesta.ok ? "ok" : "error";
-        })
-        .catch(() => {
-          estado.textContent = "PokeBot no disponible";
-          document.body.dataset.health = "error";
-        });
+        <nav class="tabs" aria-label="Secciones del panel">
+          <button class="tab is-active" type="button" data-tab="entrenar" aria-selected="true">Entrenar</button>
+          <button class="tab" type="button" data-tab="ejemplos" aria-selected="false">Ejemplos</button>
+          <button class="tab" type="button" data-tab="analiticas" aria-selected="false">Analíticas</button>
+          <button class="tab" type="button" data-tab="caracteristicas" aria-selected="false">Características</button>
+        </nav>
 
-      fetch("/api/me")
-        .then((respuesta) => respuesta.json())
-        .then(({ usuario }) => {
-          if (!usuario) return;
-          acceso.hidden = true;
-          sesion.hidden = false;
-          sesionNombre.textContent = usuario.nombre;
-          sesionInicial.textContent = usuario.nombre.trim().charAt(0).toUpperCase() || "U";
+        <div class="sidebar-user">
+          <span class="user-avatar" aria-hidden="true">
+            <img id="usuario-imagen" alt="" hidden />
+            <span id="usuario-inicial">U</span>
+          </span>
+          <div class="user-copy">
+            <strong id="usuario-nombre"></strong>
+            <span id="usuario-rol"></span>
+          </div>
+          <form action="/api/auth/logout" method="post">
+            <button class="logout" type="submit">Salir</button>
+          </form>
+        </div>
+      </aside>
 
-          if (usuario.avatarUrl) {
-            sesionImagen.src = usuario.avatarUrl;
-            sesionImagen.hidden = false;
-            sesionInicial.hidden = true;
-            sesionImagen.addEventListener("error", () => {
-              sesionImagen.hidden = true;
-              sesionInicial.hidden = false;
-            }, { once: true });
-          }
-        })
-        .catch(() => {
-          acceso.hidden = false;
-        });
-    </script>
+      <main class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p id="seccion-descripcion">Crea ejemplos claros para definir el estilo.</p>
+            <h1 id="seccion-titulo">Entrenar</h1>
+          </div>
+          <div class="panel-status">
+            <span class="health-dot" aria-hidden="true"></span>
+            <span>Conectado</span>
+          </div>
+        </header>
+
+        <div id="alerta-global" class="alert" role="alert" hidden></div>
+
+        <section class="panel" data-panel="entrenar">
+          <div class="training-layout">
+            <form id="form-ejemplo" class="training-form">
+              <div class="field">
+                <label for="entrada">Mensaje que recibiría</label>
+                <textarea id="entrada" name="entrada" rows="5" maxlength="1000" required placeholder="Ejemplo: oe vas a entrar hoy"></textarea>
+                <span>Escribe como lo haría alguien en Discord.</span>
+              </div>
+
+              <div class="field">
+                <label for="respuesta-ideal">Cómo debería responder</label>
+                <textarea id="respuesta-ideal" name="respuestaIdeal" rows="5" maxlength="2000" required placeholder="Ejemplo: ya voy oe dame chance"></textarea>
+                <span>Usa una respuesta realista, corta y natural.</span>
+              </div>
+
+              <div class="form-actions">
+                <button id="guardar-ejemplo" class="button button-accent" type="submit">Guardar ejemplo</button>
+                <span id="resultado-formulario" class="form-result" aria-live="polite"></span>
+              </div>
+            </form>
+
+            <aside class="training-guide">
+              <h2>Un buen ejemplo</h2>
+              <ul>
+                <li>Representa una conversación real.</li>
+                <li>Mantiene palabras y errores habituales.</li>
+                <li>No incluye información privada.</li>
+              </ul>
+            </aside>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="ejemplos" hidden>
+          <div class="panel-toolbar">
+            <label class="search-field" for="buscar-ejemplo">
+              <span>Buscar</span>
+              <input id="buscar-ejemplo" type="search" placeholder="Mensaje o respuesta" />
+            </label>
+            <span id="conteo-ejemplos" class="count-label"></span>
+          </div>
+          <div id="lista-ejemplos" class="examples-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel" data-panel="analiticas" hidden>
+          <dl class="metrics">
+            <div><dt>Respuestas</dt><dd id="metrica-mensajes">-</dd></div>
+            <div><dt>Votos positivos</dt><dd id="metrica-positivos">-</dd></div>
+            <div><dt>Votos negativos</dt><dd id="metrica-negativos">-</dd></div>
+            <div><dt>Ejemplos activos</dt><dd id="metrica-ejemplos">-</dd></div>
+            <div><dt>Entrenadores</dt><dd id="metrica-entrenadores">-</dd></div>
+          </dl>
+
+          <div class="analytics-grid">
+            <section class="chart-panel" aria-labelledby="grafico-titulo">
+              <header>
+                <h2 id="grafico-titulo">Feedback de los últimos 7 días</h2>
+                <div class="legend"><span class="positive">Positivo</span><span class="negative">Negativo</span></div>
+              </header>
+              <div id="grafico-feedback" class="chart" role="img" aria-label="Votos positivos y negativos por día"></div>
+            </section>
+
+            <section class="ratio-panel">
+              <span>Precisión percibida</span>
+              <strong id="ratio-positivo">0%</strong>
+              <p>Porcentaje de votos positivos sobre el feedback total.</p>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="caracteristicas" hidden>
+          <div class="features-layout">
+            <section class="feature-list">
+              <h2>Cómo funciona ahora</h2>
+              <dl>
+                <div><dt>Modelo</dt><dd id="modelo-actual">-</dd></div>
+                <div><dt>Feedback positivo</dt><dd>Se convierte en ejemplo de estilo</dd></div>
+                <div><dt>Ejemplos manuales</dt><dd>Se activan al guardarlos</dd></div>
+                <div><dt>Permisos</dt><dd>Solo entrenadores autorizados</dd></div>
+              </dl>
+            </section>
+
+            <section class="team-panel">
+              <header>
+                <h2>Equipo de entrenamiento</h2>
+                <span id="total-equipo"></span>
+              </header>
+              <div id="lista-entrenadores" class="team-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
   </body>
 </html>
