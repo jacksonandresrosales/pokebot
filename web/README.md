@@ -4,10 +4,10 @@ Panel minimalista para entrenar y supervisar el estilo del bot. Incluye:
 
 - creación y administración de ejemplos;
 - métricas de votos y actividad de los últimos siete días;
-- configuración visible del comportamiento del bot;
 - listado de amigos autorizados para entrenarlo.
 - gestión de roles, accesos e importancia de cada entrenador.
 - importación y análisis de conversaciones con aprobación manual.
+- tutorial inicial para orientar a cada tipo de usuario.
 
 ## Ejecutar
 

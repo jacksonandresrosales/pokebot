@@ -51,7 +51,6 @@
           <button id="tab-mensajes" class="tab" type="button" data-tab="mensajes" aria-selected="false" hidden>Mensajes</button>
           <button class="tab" type="button" data-tab="analiticas" aria-selected="false">Analíticas</button>
           <button id="tab-entrenadores" class="tab" type="button" data-tab="entrenadores" aria-selected="false" hidden>Entrenadores</button>
-          <button class="tab" type="button" data-tab="caracteristicas" aria-selected="false">Características</button>
         </nav>
 
         <div class="sidebar-user">
@@ -259,29 +258,20 @@
           </div>
         </section>
 
-        <section class="panel" data-panel="caracteristicas" hidden>
-          <div class="features-layout">
-            <section class="feature-list">
-              <h2>Cómo funciona ahora</h2>
-              <dl>
-                <div><dt>Modelo</dt><dd id="modelo-actual">-</dd></div>
-                <div><dt>Feedback positivo</dt><dd>Se convierte en ejemplo de estilo</dd></div>
-                <div><dt>Ejemplos manuales</dt><dd>Se activan al guardarlos</dd></div>
-                <div><dt>Conversaciones</dt><dd>Gemini propone y un administrador aprueba</dd></div>
-                <div><dt>Permisos</dt><dd>Solo entrenadores autorizados</dd></div>
-              </dl>
-            </section>
-
-            <section class="team-panel">
-              <header>
-                <h2>Equipo de entrenamiento</h2>
-                <span id="total-equipo"></span>
-              </header>
-              <div id="lista-entrenadores" class="team-list"></div>
-            </section>
-          </div>
-        </section>
       </main>
     </div>
+
+    <section id="tutorial" class="tutorial" role="dialog" aria-modal="true" aria-labelledby="tutorial-titulo" hidden>
+      <div class="tutorial-card">
+        <div id="tutorial-progreso" class="tutorial-progress" aria-hidden="true"></div>
+        <p id="tutorial-paso" class="tutorial-step"></p>
+        <h2 id="tutorial-titulo"></h2>
+        <p id="tutorial-descripcion" class="tutorial-description"></p>
+        <div class="tutorial-actions">
+          <button id="tutorial-anterior" class="tutorial-back" type="button">Atrás</button>
+          <button id="tutorial-siguiente" class="button button-accent" type="button">Continuar</button>
+        </div>
+      </div>
+    </section>
   </body>
 </html>

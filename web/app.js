@@ -13,6 +13,9 @@ const formularioImportacion = document.querySelector("#form-importacion");
 const archivoMensajes = document.querySelector("#archivo-mensajes");
 const botonGuardarImportacion = document.querySelector("#guardar-importacion");
 const resultadoImportacion = document.querySelector("#resultado-importacion");
+const tutorial = document.querySelector("#tutorial");
+const botonTutorialAnterior = document.querySelector("#tutorial-anterior");
+const botonTutorialSiguiente = document.querySelector("#tutorial-siguiente");
 
 const secciones = {
   entrenar: ["Entrenar", "Crea ejemplos claros para definir el estilo."],
@@ -20,13 +23,14 @@ const secciones = {
   mensajes: ["Mensajes", "Importa conversaciones y revisa lo que Gemini propone."],
   analiticas: ["Analíticas", "Observa cómo responden los amigos en Discord."],
   entrenadores: ["Entrenadores", "Administra accesos y el peso de cada persona."],
-  caracteristicas: ["Características", "Consulta el modelo, permisos y equipo actual."],
 };
 
 const estadoApp = {
   usuario: null,
   datos: null,
   filtro: "",
+  pasoTutorial: 0,
+  pasosTutorial: [],
 };
 
 async function solicitar(url, opciones = {}) {
@@ -75,6 +79,86 @@ function seleccionarTab(nombre) {
 
   document.querySelector("#seccion-titulo").textContent = secciones[nombre][0];
   document.querySelector("#seccion-descripcion").textContent = secciones[nombre][1];
+}
+
+function crearPasosTutorial(rol) {
+  const pasosComunes = [
+    {
+      tab: "entrenar",
+      titulo: "Así se entrena a PokeBot",
+      descripcion: "Escribe un mensaje y la respuesta que mejor representa a Poke. Los ejemplos claros hacen que el estilo sea más consistente.",
+    },
+    {
+      tab: "ejemplos",
+      titulo: "Revisa lo que aprende",
+      descripcion: "Aquí puedes consultar los ejemplos activos y pausar los que ya no representen bien a Poke.",
+    },
+    {
+      tab: "analiticas",
+      titulo: "Mide cómo va",
+      descripcion: "Los pulgares de Discord aparecen aquí. Úsalos para saber si las respuestas se parecen cada vez más.",
+    },
+  ];
+
+  if (rol !== "administrador") return pasosComunes;
+
+  return [
+    pasosComunes[0],
+    {
+      tab: "entrenadores",
+      titulo: "Organiza al equipo",
+      descripcion: "Autoriza a tus amigos y asigna su importancia. Un peso mayor hace que sus aportes influyan más en el estilo.",
+    },
+    {
+      tab: "mensajes",
+      titulo: "Aprovecha conversaciones reales",
+      descripcion: "Importa un archivo, deja que Gemini proponga ejemplos y aprueba solo los que realmente suenen a Poke.",
+    },
+    ...pasosComunes.slice(1),
+  ];
+}
+
+function renderTutorial() {
+  const paso = estadoApp.pasosTutorial[estadoApp.pasoTutorial];
+  seleccionarTab(paso.tab);
+  document.querySelector("#tutorial-paso").textContent = `Paso ${estadoApp.pasoTutorial + 1} de ${estadoApp.pasosTutorial.length}`;
+  document.querySelector("#tutorial-titulo").textContent = paso.titulo;
+  document.querySelector("#tutorial-descripcion").textContent = paso.descripcion;
+  botonTutorialAnterior.hidden = estadoApp.pasoTutorial === 0;
+  botonTutorialSiguiente.textContent = estadoApp.pasoTutorial === estadoApp.pasosTutorial.length - 1 ? "Empezar" : "Continuar";
+
+  const progreso = document.querySelector("#tutorial-progreso");
+  progreso.replaceChildren();
+  estadoApp.pasosTutorial.forEach((_, indice) => {
+    const indicador = crearElemento("span", indice <= estadoApp.pasoTutorial ? "is-complete" : "");
+    progreso.append(indicador);
+  });
+}
+
+function iniciarTutorial() {
+  estadoApp.pasosTutorial = crearPasosTutorial(estadoApp.usuario.rol);
+  estadoApp.pasoTutorial = 0;
+  dashboard.inert = true;
+  document.body.classList.add("is-tutorial-active");
+  tutorial.hidden = false;
+  renderTutorial();
+  botonTutorialSiguiente.focus();
+}
+
+function avanzarTutorial(direccion) {
+  const siguientePaso = estadoApp.pasoTutorial + direccion;
+  if (siguientePaso < 0) return;
+
+  if (siguientePaso >= estadoApp.pasosTutorial.length) {
+    tutorial.hidden = true;
+    dashboard.inert = false;
+    document.body.classList.remove("is-tutorial-active");
+    document.querySelector(`[data-tab="${estadoApp.pasosTutorial.at(-1).tab}"]`).focus();
+    return;
+  }
+
+  estadoApp.pasoTutorial = siguientePaso;
+  renderTutorial();
 }
 
 function crearElemento(etiqueta, clase, texto) {
@@ -175,29 +259,6 @@ function renderAnaliticas() {
     barras.append(positiva, negativa);
     grupo.append(barras, crearElemento("span", "chart-label", fechaCorta(`${dia.fecha}T12:00:00`)));
     grafico.append(grupo);
-  }
-}
-
-function renderCaracteristicas() {
-  document.querySelector("#modelo-actual").textContent = estadoApp.datos.caracteristicas.modelo;
-  const entrenadores = estadoApp.datos.entrenadores;
-  const lista = document.querySelector("#lista-entrenadores");
-  lista.replaceChildren();
-  document.querySelector("#total-equipo").textContent = `${entrenadores.length} personas`;
-
-  for (const entrenador of entrenadores) {
-    const fila = crearElemento("div", "team-row");
-    fila.append(
-      crearElemento("strong", "", entrenador.nombre),
-      crearElemento(
-        "span",
-        "",
-        entrenador.puedeEntrenar
-          ? `${entrenador.rol} · importancia ${entrenador.importancia}`
-          : "sin acceso",
-      ),
-    );
-    lista.append(fila);
   }
 }
 
@@ -474,7 +535,6 @@ function renderPropuestas() {
 function renderTodo() {
   renderEjemplos();
   renderAnaliticas();
-  renderCaracteristicas();
   renderGestionEntrenadores();
   if (estadoApp.usuario.rol === "administrador") {
     renderAportantes();
@@ -488,8 +548,10 @@ async function cargarDashboard() {
     estadoApp.datos = await solicitar("/api/dashboard");
     renderTodo();
     alertaGlobal.hidden = true;
+    return true;
   } catch (error) {
     mostrarAlerta(error.message);
+    return false;
   }
 }
 
@@ -625,6 +687,9 @@ for (const boton of document.querySelectorAll("[data-tab]")) {
   boton.addEventListener("click", () => seleccionarTab(boton.dataset.tab));
 }
 
+botonTutorialAnterior.addEventListener("click", () => avanzarTutorial(-1));
+botonTutorialSiguiente.addEventListener("click", () => avanzarTutorial(1));
+
 async function iniciar() {
   try {
     const { usuario } = await solicitar("/api/me");
@@ -643,7 +708,13 @@ async function iniciar() {
     mostrarAvatar(usuario);
     landing.hidden = true;
     dashboard.hidden = false;
-    await cargarDashboard();
+    dashboard.inert = true;
+    const panelListo = await cargarDashboard();
+    if (panelListo) {
+      iniciarTutorial();
+    } else {
+      dashboard.inert = false;
+    }
   } catch {
     estado.textContent = "PokeBot no disponible";
     document.body.dataset.health = "error";

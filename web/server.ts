@@ -208,12 +208,6 @@ async function manejarDashboard(
     entrenadores: entrenadoresVisibles,
     importaciones,
     propuestas,
-    caracteristicas: {
-      modelo: configuracion.geminiModel(),
-      aprendeDeFeedback: true,
-      admiteEjemplosManuales: true,
-      multiplesEntrenadores: true,
-    },
   });
 }
 
