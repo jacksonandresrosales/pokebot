@@ -38,6 +38,8 @@ import type { UsuarioEntrenador } from "../src/types/index.js";
 
 const directorioWeb = resolve(process.cwd(), "web");
 const nombreCookie = "pokebot_sesion";
+const maximoArchivoMensajesBytes = 2 * 1024 * 1024;
+const margenJsonArchivoMensajesBytes = 16 * 1024;
 
 interface Sesion {
   discordUserId: string;
@@ -54,6 +56,8 @@ function encabezadosJson(): Record<string, string> {
     "X-Content-Type-Options": "nosniff",
   };
 }
+
+class CuerpoDemasiadoGrandeError extends Error {}
 
 function responderJson(
   respuesta: ServerResponse,
@@ -163,7 +167,7 @@ async function leerJson<T>(
     total += buffer.length;
 
     if (total > maximoBytes) {
-      throw new Error("El cuerpo de la petición es demasiado grande.");
+      throw new CuerpoDemasiadoGrandeError("El cuerpo de la petición es demasiado grande.");
     }
 
     partes.push(buffer);
@@ -263,9 +267,20 @@ async function manejarNuevaImportacion(
   };
 
   try {
-    contenido = await leerJson(solicitud, 96 * 1024);
-  } catch {
-    responderJson(respuesta, 400, { error: "El archivo no pudo procesarse." });
+    contenido = await leerJson(
+      solicitud,
+      maximoArchivoMensajesBytes + margenJsonArchivoMensajesBytes,
+    );
+  } catch (error) {
+    responderJson(
+      respuesta,
+      error instanceof CuerpoDemasiadoGrandeError ? 413 : 400,
+      {
+        error: error instanceof CuerpoDemasiadoGrandeError
+          ? "El archivo no puede superar los 2 MB."
+          : "El archivo no pudo procesarse.",
+      },
+    );
     return;
   }
 
@@ -300,8 +315,15 @@ async function manejarNuevaImportacion(
     return;
   }
 
-  if (texto.length < 10 || texto.length > 60_000) {
-    responderJson(respuesta, 400, { error: "El archivo debe contener entre 10 y 60 000 caracteres." });
+  const pesoTexto = Buffer.byteLength(texto, "utf8");
+
+  if (texto.length < 10) {
+    responderJson(respuesta, 400, { error: "El archivo debe contener al menos 10 caracteres." });
+    return;
+  }
+
+  if (pesoTexto > maximoArchivoMensajesBytes) {
+    responderJson(respuesta, 413, { error: "El archivo no puede superar los 2 MB." });
     return;
   }
 

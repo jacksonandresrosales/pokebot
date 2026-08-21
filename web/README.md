@@ -10,6 +10,8 @@ Panel minimalista para entrenar y supervisar el estilo del bot. Incluye:
 - importación y análisis de conversaciones con aprobación manual.
 - tutorial inicial para orientar a cada tipo de usuario.
 
+Las conversaciones importadas deben ser archivos TXT, JSON o CSV de hasta 2 MB.
+
 ## Ejecutar
 
 Completa estas variables en `.env`:
@@ -40,7 +42,13 @@ Con el servidor web activo, puedes comprobar el panel y su conexión con la
 base de datos mediante:
 
 ```bash
+npm run verify
+```
+
+La comprobación completa de análisis de conversaciones usa Gemini y puede
+consumir cuota de IA, por lo que se ejecuta aparte:
+
+```bash
 npm run db:verify-panel
 npm run db:verify-messages
-npm run web:verify-panel
 ```

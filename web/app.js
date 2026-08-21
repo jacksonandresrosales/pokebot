@@ -19,6 +19,7 @@ const resultadoImportacion = document.querySelector("#resultado-importacion");
 const tutorial = document.querySelector("#tutorial");
 const botonTutorialAnterior = document.querySelector("#tutorial-anterior");
 const botonTutorialSiguiente = document.querySelector("#tutorial-siguiente");
+const maximoArchivoMensajesBytes = 2 * 1024 * 1024;
 
 const secciones = {
   entrenar: ["Entrenar", "Crea ejemplos claros para definir el estilo."],
@@ -723,7 +724,13 @@ formularioEntrenador.addEventListener("submit", async (evento) => {
 });
 
 archivoMensajes.addEventListener("change", () => {
-  document.querySelector("#archivo-nombre").textContent = archivoMensajes.files[0]?.name ?? "Seleccionar archivo";
+  const archivo = archivoMensajes.files[0];
+  document.querySelector("#archivo-nombre").textContent = archivo?.name ?? "Seleccionar archivo";
+
+  if (archivo && archivo.size > maximoArchivoMensajesBytes) {
+    resultadoImportacion.textContent = "El archivo no puede superar los 2 MB.";
+    resultadoImportacion.className = "form-result is-error";
+  }
 });
 
 formularioImportacion.addEventListener("submit", async (evento) => {
@@ -733,6 +740,12 @@ formularioImportacion.addEventListener("submit", async (evento) => {
 
   if (!archivo || !["txt", "json", "csv"].includes(extension)) {
     resultadoImportacion.textContent = "Selecciona un archivo TXT, JSON o CSV.";
+    resultadoImportacion.className = "form-result is-error";
+    return;
+  }
+
+  if (archivo.size > maximoArchivoMensajesBytes) {
+    resultadoImportacion.textContent = "El archivo no puede superar los 2 MB.";
     resultadoImportacion.className = "form-result is-error";
     return;
   }

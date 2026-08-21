@@ -83,6 +83,30 @@ try {
     throw new Error(`La importación respondió con estado ${importacion.status}.`);
   }
 
+  const importacionDemasiadoGrande = await fetch(
+    `${configuracion.webUrl()}/api/message-imports`,
+    {
+      method: "POST",
+      headers: {
+        Cookie: cookie,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        nombreArchivo: "demasiado-grande.txt",
+        formato: "txt",
+        nombreObjetivo: "Poke",
+        aportadoPorId: administradorPrincipal.id,
+        texto: "x".repeat(2 * 1024 * 1024 + 1),
+      }),
+    },
+  );
+
+  if (importacionDemasiadoGrande.status !== 413) {
+    throw new Error(
+      `Un archivo de más de 2 MB respondió con estado ${importacionDemasiadoGrande.status}.`,
+    );
+  }
+
   const creacion = await fetch(`${configuracion.webUrl()}/api/examples`, {
     method: "POST",
     headers: {
@@ -320,6 +344,7 @@ try {
         )
       ).rows[0]?.importancia === 4,
       importacionCreada: importacion.status === 201,
+      archivoGrandeRechazado: importacionDemasiadoGrande.status === 413,
       datosMensajesVisibles: Array.isArray(panelInicial.importaciones)
         && Array.isArray(panelInicial.propuestas),
     }),

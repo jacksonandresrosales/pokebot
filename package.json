@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run build && npm run db:verify-panel && npm run web:verify-panel",
     "db:setup": "tsx scripts/aplicar-esquema.ts",
     "db:verify-panel": "tsx scripts/verificar-panel.ts",
     "db:verify-messages": "tsx scripts/verificar-mensajes.ts",
