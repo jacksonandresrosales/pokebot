@@ -63,6 +63,41 @@ export interface EntrenadorPanel {
   esPrincipal: boolean;
 }
 
+export interface ImportacionMensajesPanel {
+  id: string;
+  nombreArchivo: string;
+  formato: "txt" | "json" | "csv";
+  nombreObjetivo: string;
+  estado: "pendiente" | "analizando" | "listo" | "error";
+  resumen: string | null;
+  patrones: string[];
+  error: string | null;
+  aportadoPor: string;
+  importancia: number;
+  propuestas: number;
+  pendientes: number;
+  analisisIniciadoAt: Date | null;
+  createdAt: Date;
+}
+
+export interface PropuestaEntrenamientoPanel {
+  id: string;
+  importacionId: string;
+  entrada: string;
+  respuestaIdeal: string;
+  estado: "pendiente" | "aprobada" | "rechazada";
+  nombreArchivo: string;
+  aportadoPor: string;
+  importancia: number;
+  createdAt: Date;
+}
+
+export interface ImportacionParaAnalisis {
+  id: string;
+  contenido: string;
+  nombreObjetivo: string;
+}
+
 export async function obtenerEjemplosEstilo(
   limite = 5,
 ): Promise<EjemploDeEstilo[]> {
@@ -354,6 +389,289 @@ export async function asegurarAdministradorPrincipal(): Promise<void> {
     `,
     [configuracion.adminDiscordId()],
   );
+}
+
+export async function crearImportacionMensajes(
+  nombreArchivo: string,
+  formato: ImportacionMensajesPanel["formato"],
+  nombreObjetivo: string,
+  contenido: string,
+  aportadoPorId: string,
+  creadorDiscordUserId: string,
+): Promise<string | null> {
+  const resultado = await pool.query<{ id: string }>(
+    `
+      insert into importaciones_mensajes (
+        nombre_archivo,
+        formato,
+        nombre_objetivo,
+        contenido,
+        aportado_por,
+        creado_por
+      )
+      select $1, $2, $3, $4, aportante.id, creador.id
+      from usuarios as aportante
+      join usuarios as creador on creador.discord_user_id = $6
+      where aportante.id = $5
+        and aportante.puede_entrenar = true
+        and creador.rol = 'administrador'
+        and creador.puede_entrenar = true
+      returning id
+    `,
+    [
+      nombreArchivo,
+      formato,
+      nombreObjetivo,
+      contenido,
+      aportadoPorId,
+      creadorDiscordUserId,
+    ],
+  );
+
+  return resultado.rows[0]?.id ?? null;
+}
+
+export async function listarImportacionesMensajes(
+  limite = 30,
+): Promise<ImportacionMensajesPanel[]> {
+  const limiteSeguro = Math.min(Math.max(Math.trunc(limite), 1), 100);
+  const resultado = await pool.query<ImportacionMensajesPanel>(
+    `
+      select
+        importaciones_mensajes.id,
+        importaciones_mensajes.nombre_archivo as "nombreArchivo",
+        importaciones_mensajes.formato,
+        importaciones_mensajes.nombre_objetivo as "nombreObjetivo",
+        importaciones_mensajes.estado,
+        importaciones_mensajes.resumen,
+        importaciones_mensajes.patrones,
+        importaciones_mensajes.error,
+        usuarios.nombre as "aportadoPor",
+        usuarios.importancia::int,
+        count(propuestas_entrenamiento.id)::int as propuestas,
+        count(propuestas_entrenamiento.id) filter (
+          where propuestas_entrenamiento.estado = 'pendiente'
+        )::int as pendientes,
+        importaciones_mensajes.analisis_iniciado_at as "analisisIniciadoAt",
+        importaciones_mensajes.created_at as "createdAt"
+      from importaciones_mensajes
+      join usuarios on usuarios.id = importaciones_mensajes.aportado_por
+      left join propuestas_entrenamiento
+        on propuestas_entrenamiento.importacion_id = importaciones_mensajes.id
+      group by importaciones_mensajes.id, usuarios.id
+      order by importaciones_mensajes.created_at desc
+      limit $1
+    `,
+    [limiteSeguro],
+  );
+
+  return resultado.rows;
+}
+
+export async function listarPropuestasEntrenamiento(
+  limite = 100,
+): Promise<PropuestaEntrenamientoPanel[]> {
+  const limiteSeguro = Math.min(Math.max(Math.trunc(limite), 1), 200);
+  const resultado = await pool.query<PropuestaEntrenamientoPanel>(
+    `
+      select
+        propuestas_entrenamiento.id,
+        propuestas_entrenamiento.importacion_id as "importacionId",
+        propuestas_entrenamiento.entrada,
+        propuestas_entrenamiento.respuesta_ideal as "respuestaIdeal",
+        propuestas_entrenamiento.estado,
+        importaciones_mensajes.nombre_archivo as "nombreArchivo",
+        usuarios.nombre as "aportadoPor",
+        usuarios.importancia::int,
+        propuestas_entrenamiento.created_at as "createdAt"
+      from propuestas_entrenamiento
+      join importaciones_mensajes
+        on importaciones_mensajes.id = propuestas_entrenamiento.importacion_id
+      join usuarios on usuarios.id = importaciones_mensajes.aportado_por
+      order by
+        case propuestas_entrenamiento.estado when 'pendiente' then 0 else 1 end,
+        propuestas_entrenamiento.created_at desc
+      limit $1
+    `,
+    [limiteSeguro],
+  );
+
+  return resultado.rows;
+}
+
+export async function iniciarAnalisisImportacion(
+  id: string,
+): Promise<ImportacionParaAnalisis | null> {
+  const resultado = await pool.query<ImportacionParaAnalisis>(
+    `
+      update importaciones_mensajes
+      set
+        estado = 'analizando',
+        error = null,
+        analisis_iniciado_at = now()
+      where id = $1
+        and (
+          estado in ('pendiente', 'error')
+          or (
+            estado = 'analizando'
+            and analisis_iniciado_at < now() - interval '10 minutes'
+          )
+        )
+      returning
+        id,
+        contenido,
+        nombre_objetivo as "nombreObjetivo"
+    `,
+    [id],
+  );
+
+  return resultado.rows[0] ?? null;
+}
+
+export async function guardarAnalisisImportacion(
+  id: string,
+  resumen: string,
+  patrones: string[],
+  propuestas: Array<{ entrada: string; respuestaIdeal: string }>,
+): Promise<void> {
+  const cliente = await pool.connect();
+
+  try {
+    await cliente.query("begin");
+    await cliente.query(
+      `
+        update importaciones_mensajes
+        set
+          estado = 'listo',
+          resumen = $2,
+          patrones = $3::jsonb,
+          error = null,
+          analisis_iniciado_at = null,
+          analizado_at = now()
+        where id = $1
+          and estado = 'analizando'
+      `,
+      [id, resumen, JSON.stringify(patrones)],
+    );
+
+    for (const propuesta of propuestas) {
+      await cliente.query(
+        `
+          insert into propuestas_entrenamiento (
+            importacion_id,
+            entrada,
+            respuesta_ideal
+          ) values ($1, $2, $3)
+          on conflict do nothing
+        `,
+        [id, propuesta.entrada, propuesta.respuestaIdeal],
+      );
+    }
+
+    await cliente.query("commit");
+  } catch (error) {
+    await cliente.query("rollback");
+    throw error;
+  } finally {
+    cliente.release();
+  }
+}
+
+export async function marcarErrorAnalisisImportacion(
+  id: string,
+  mensaje: string,
+): Promise<void> {
+  await pool.query(
+    `
+      update importaciones_mensajes
+      set estado = 'error', error = $2, analisis_iniciado_at = null
+      where id = $1
+    `,
+    [id, mensaje.slice(0, 500)],
+  );
+}
+
+export async function actualizarEstadoPropuesta(
+  id: string,
+  estado: "aprobada" | "rechazada",
+): Promise<boolean> {
+  const cliente = await pool.connect();
+
+  try {
+    await cliente.query("begin");
+    const propuesta = await cliente.query<{
+      entrada: string;
+      respuestaIdeal: string;
+      ejemploId: string | null;
+      aportadoPorId: string;
+    }>(
+      `
+        select
+          propuestas_entrenamiento.entrada,
+          propuestas_entrenamiento.respuesta_ideal as "respuestaIdeal",
+          propuestas_entrenamiento.ejemplo_id as "ejemploId",
+          importaciones_mensajes.aportado_por as "aportadoPorId"
+        from propuestas_entrenamiento
+        join importaciones_mensajes
+          on importaciones_mensajes.id = propuestas_entrenamiento.importacion_id
+        where propuestas_entrenamiento.id = $1
+        for update of propuestas_entrenamiento
+      `,
+      [id],
+    );
+    const fila = propuesta.rows[0];
+
+    if (!fila) {
+      await cliente.query("rollback");
+      return false;
+    }
+
+    let ejemploId = fila.ejemploId;
+
+    if (estado === "aprobada" && ejemploId) {
+      await cliente.query(
+        `update ejemplos_estilo set aprobado = true where id = $1`,
+        [ejemploId],
+      );
+    } else if (estado === "aprobada") {
+      const ejemplo = await cliente.query<{ id: string }>(
+        `
+          insert into ejemplos_estilo (
+            entrada,
+            respuesta_ideal,
+            origen,
+            aprobado,
+            creado_por
+          ) values ($1, $2, 'importacion', true, $3)
+          on conflict do nothing
+          returning id
+        `,
+        [fila.entrada, fila.respuestaIdeal, fila.aportadoPorId],
+      );
+      ejemploId = ejemplo.rows[0]?.id ?? null;
+    } else if (ejemploId) {
+      await cliente.query(
+        `update ejemplos_estilo set aprobado = false where id = $1`,
+        [ejemploId],
+      );
+    }
+
+    await cliente.query(
+      `
+        update propuestas_entrenamiento
+        set estado = $2, ejemplo_id = $3, updated_at = now()
+        where id = $1
+      `,
+      [id, estado, ejemploId],
+    );
+    await cliente.query("commit");
+    return true;
+  } catch (error) {
+    await cliente.query("rollback");
+    throw error;
+  } finally {
+    cliente.release();
+  }
 }
 
 export async function registrarUsuario(

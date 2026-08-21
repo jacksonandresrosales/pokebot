@@ -7,6 +7,7 @@ Panel minimalista para entrenar y supervisar el estilo del bot. Incluye:
 - configuración visible del comportamiento del bot;
 - listado de amigos autorizados para entrenarlo.
 - gestión de roles, accesos e importancia de cada entrenador.
+- importación y análisis de conversaciones con aprobación manual.
 
 ## Ejecutar
 
@@ -39,5 +40,6 @@ base de datos mediante:
 
 ```bash
 npm run db:verify-panel
+npm run db:verify-messages
 npm run web:verify-panel
 ```

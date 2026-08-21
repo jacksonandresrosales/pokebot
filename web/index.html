@@ -48,6 +48,7 @@
         <nav class="tabs" aria-label="Secciones del panel">
           <button class="tab is-active" type="button" data-tab="entrenar" aria-selected="true">Entrenar</button>
           <button class="tab" type="button" data-tab="ejemplos" aria-selected="false">Ejemplos</button>
+          <button id="tab-mensajes" class="tab" type="button" data-tab="mensajes" aria-selected="false" hidden>Mensajes</button>
           <button class="tab" type="button" data-tab="analiticas" aria-selected="false">Analíticas</button>
           <button id="tab-entrenadores" class="tab" type="button" data-tab="entrenadores" aria-selected="false" hidden>Entrenadores</button>
           <button class="tab" type="button" data-tab="caracteristicas" aria-selected="false">Características</button>
@@ -123,6 +124,59 @@
             <span id="conteo-ejemplos" class="count-label"></span>
           </div>
           <div id="lista-ejemplos" class="examples-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel" data-panel="mensajes" hidden>
+          <div class="messages-layout">
+            <form id="form-importacion" class="import-form">
+              <header>
+                <h2>Importar conversación</h2>
+                <p>TXT, JSON o CSV. Máximo 60 000 caracteres.</p>
+              </header>
+
+              <label class="file-field" for="archivo-mensajes">
+                <input id="archivo-mensajes" name="archivo" type="file" accept=".txt,.json,.csv,text/plain,application/json,text/csv" required />
+                <span id="archivo-nombre">Seleccionar archivo</span>
+                <strong>Buscar</strong>
+              </label>
+
+              <div class="field-row">
+                <label class="field" for="nombre-objetivo">
+                  <span>Nombre de Poke en el archivo</span>
+                  <input id="nombre-objetivo" name="nombreObjetivo" type="text" maxlength="80" placeholder="Ejemplo: Poke" required autocomplete="off" />
+                </label>
+                <label class="field" for="aportado-por">
+                  <span>Conversación aportada por</span>
+                  <select id="aportado-por" name="aportadoPorId" required></select>
+                </label>
+              </div>
+
+              <div class="form-actions">
+                <button id="guardar-importacion" class="button button-accent" type="submit">Importar</button>
+                <span id="resultado-importacion" class="form-result" aria-live="polite"></span>
+              </div>
+            </form>
+
+            <section class="imports-section" aria-labelledby="importaciones-titulo">
+              <header class="section-heading">
+                <div>
+                  <h2 id="importaciones-titulo">Conversaciones</h2>
+                  <p id="conteo-importaciones"></p>
+                </div>
+              </header>
+              <div id="lista-importaciones" class="imports-list" aria-live="polite"></div>
+            </section>
+
+            <section class="proposals-section" aria-labelledby="propuestas-titulo">
+              <header class="section-heading">
+                <div>
+                  <h2 id="propuestas-titulo">Propuestas</h2>
+                  <p id="conteo-propuestas"></p>
+                </div>
+              </header>
+              <div id="lista-propuestas" class="proposals-list" aria-live="polite"></div>
+            </section>
+          </div>
         </section>
 
         <section class="panel" data-panel="analiticas" hidden>
@@ -213,6 +267,7 @@
                 <div><dt>Modelo</dt><dd id="modelo-actual">-</dd></div>
                 <div><dt>Feedback positivo</dt><dd>Se convierte en ejemplo de estilo</dd></div>
                 <div><dt>Ejemplos manuales</dt><dd>Se activan al guardarlos</dd></div>
+                <div><dt>Conversaciones</dt><dd>Gemini propone y un administrador aprueba</dd></div>
                 <div><dt>Permisos</dt><dd>Solo entrenadores autorizados</dd></div>
               </dl>
             </section>

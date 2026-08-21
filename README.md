@@ -6,6 +6,9 @@ Actualmente responde cuando lo mencionan, añade botones 👍/👎 y guarda el
 feedback en Supabase. Las respuestas con voto positivo se convierten en
 ejemplos de estilo para las siguientes respuestas.
 
+El panel web permite administrar entrenadores, importar conversaciones,
+analizarlas con Gemini y aprobar manualmente los ejemplos propuestos.
+
 ## Estructura
 
 ```text

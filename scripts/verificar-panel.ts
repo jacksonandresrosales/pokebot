@@ -52,6 +52,41 @@ try {
         "positivo",
       )
     : null;
+  const seguridadMensajes = await pool.query<{
+    tablas: number;
+    protegidas: boolean;
+  }>(
+    `
+      select
+        count(*)::int as tablas,
+        bool_and(relrowsecurity) as protegidas
+      from pg_class
+      where oid in (
+        'public.importaciones_mensajes'::regclass,
+        'public.propuestas_entrenamiento'::regclass
+      )
+    `,
+  );
+  const clavesSinIndice = await pool.query(
+    `
+      select 1
+      from pg_constraint as restriccion
+      join pg_attribute as columna
+        on columna.attrelid = restriccion.conrelid
+        and columna.attnum = any(restriccion.conkey)
+      where restriccion.contype = 'f'
+        and restriccion.conrelid in (
+          'public.importaciones_mensajes'::regclass,
+          'public.propuestas_entrenamiento'::regclass
+        )
+        and not exists (
+          select 1
+          from pg_index as indice
+          where indice.indrelid = restriccion.conrelid
+            and columna.attnum = any(indice.indkey)
+        )
+    `,
+  );
 
   console.log(
     JSON.stringify({
@@ -67,6 +102,9 @@ try {
           && entrenador.puedeEntrenar,
       ),
       feedbackNoAutorizadoBloqueado: feedbackNoAutorizado?.autorizado === false,
+      tablasMensajesConRls: seguridadMensajes.rows[0]?.tablas === 2
+        && seguridadMensajes.rows[0]?.protegidas,
+      clavesForaneasMensajesConIndice: clavesSinIndice.rowCount === 0,
     }),
   );
 } finally {

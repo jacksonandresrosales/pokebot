@@ -7,13 +7,24 @@ import { resolve } from "node:path";
 
 import { configuracion } from "../src/config/env.js";
 import {
+  analizarMensajesConGemini,
+  ocultarDatosSensibles,
+} from "../src/ai/message-analysis.js";
+import {
   actualizarEntrenador,
   actualizarAprobacionEjemplo,
   asegurarAdministradorPrincipal,
   crearEntrenador,
   crearEjemploManual,
+  crearImportacionMensajes,
+  actualizarEstadoPropuesta,
+  guardarAnalisisImportacion,
+  iniciarAnalisisImportacion,
   listarEjemplosPanel,
   listarEntrenadores,
+  listarImportacionesMensajes,
+  listarPropuestasEntrenamiento,
+  marcarErrorAnalisisImportacion,
   obtenerAnaliticasEntrenamiento,
   obtenerUsuarioPorDiscordId,
   registrarUsuario,
@@ -135,7 +146,10 @@ async function obtenerSesionActual(
   };
 }
 
-async function leerJson<T>(solicitud: IncomingMessage): Promise<T> {
+async function leerJson<T>(
+  solicitud: IncomingMessage,
+  maximoBytes = 64 * 1024,
+): Promise<T> {
   const partes: Buffer[] = [];
   let total = 0;
 
@@ -143,7 +157,7 @@ async function leerJson<T>(solicitud: IncomingMessage): Promise<T> {
     const buffer = Buffer.isBuffer(parte) ? parte : Buffer.from(parte);
     total += buffer.length;
 
-    if (total > 64 * 1024) {
+    if (total > maximoBytes) {
       throw new Error("El cuerpo de la petición es demasiado grande.");
     }
 
@@ -170,13 +184,16 @@ async function manejarDashboard(
     return;
   }
 
-  const [ejemplos, analiticas, entrenadores] = await Promise.all([
+  const esAdministrador = sesion.rol === "administrador";
+  const [ejemplos, analiticas, entrenadores, importaciones, propuestas] = await Promise.all([
     listarEjemplosPanel(),
     obtenerAnaliticasEntrenamiento(),
     listarEntrenadores(),
+    esAdministrador ? listarImportacionesMensajes() : Promise.resolve([]),
+    esAdministrador ? listarPropuestasEntrenamiento() : Promise.resolve([]),
   ]);
 
-  const entrenadoresVisibles = sesion.rol === "administrador"
+  const entrenadoresVisibles = esAdministrador
     ? entrenadores
     : entrenadores.map(({ nombre, rol, puedeEntrenar, importancia }) => ({
         nombre,
@@ -189,6 +206,8 @@ async function manejarDashboard(
     ejemplos,
     analiticas,
     entrenadores: entrenadoresVisibles,
+    importaciones,
+    propuestas,
     caracteristicas: {
       modelo: configuracion.geminiModel(),
       aprendeDeFeedback: true,
@@ -196,6 +215,177 @@ async function manejarDashboard(
       multiplesEntrenadores: true,
     },
   });
+}
+
+function esFormatoMensajes(valor: unknown): valor is "txt" | "json" | "csv" {
+  return valor === "txt" || valor === "json" || valor === "csv";
+}
+
+async function manejarNuevaImportacion(
+  solicitud: IncomingMessage,
+  respuesta: ServerResponse,
+): Promise<void> {
+  const sesion = await obtenerSesionActual(solicitud);
+
+  if (!sesion || sesion.rol !== "administrador") {
+    responderJson(respuesta, 403, { error: "Solo los administradores pueden importar mensajes." });
+    return;
+  }
+
+  let contenido: {
+    nombreArchivo?: unknown;
+    formato?: unknown;
+    nombreObjetivo?: unknown;
+    texto?: unknown;
+    aportadoPorId?: unknown;
+  };
+
+  try {
+    contenido = await leerJson(solicitud, 96 * 1024);
+  } catch {
+    responderJson(respuesta, 400, { error: "El archivo no pudo procesarse." });
+    return;
+  }
+
+  const nombreArchivo = typeof contenido.nombreArchivo === "string"
+    ? contenido.nombreArchivo.trim()
+    : "";
+  const nombreObjetivo = typeof contenido.nombreObjetivo === "string"
+    ? contenido.nombreObjetivo.trim()
+    : "";
+  const texto = typeof contenido.texto === "string" ? contenido.texto.trim() : "";
+  const aportadoPorId = typeof contenido.aportadoPorId === "string"
+    ? contenido.aportadoPorId
+    : "";
+
+  if (nombreArchivo.length < 1 || nombreArchivo.length > 160) {
+    responderJson(respuesta, 400, { error: "El nombre del archivo no es válido." });
+    return;
+  }
+
+  if (!esFormatoMensajes(contenido.formato)) {
+    responderJson(respuesta, 400, { error: "Solo se admiten archivos TXT, JSON o CSV." });
+    return;
+  }
+
+  if (nombreObjetivo.length < 1 || nombreObjetivo.length > 80) {
+    responderJson(respuesta, 400, { error: "Indica cómo aparece Poke en la conversación." });
+    return;
+  }
+
+  if (!esUuid(aportadoPorId)) {
+    responderJson(respuesta, 400, { error: "Selecciona quién aportó la conversación." });
+    return;
+  }
+
+  if (texto.length < 10 || texto.length > 60_000) {
+    responderJson(respuesta, 400, { error: "El archivo debe contener entre 10 y 60 000 caracteres." });
+    return;
+  }
+
+  const id = await crearImportacionMensajes(
+    nombreArchivo,
+    contenido.formato,
+    nombreObjetivo,
+    ocultarDatosSensibles(texto),
+    aportadoPorId,
+    sesion.discordUserId,
+  );
+
+  if (!id) {
+    responderJson(respuesta, 400, { error: "El entrenador seleccionado no tiene acceso." });
+    return;
+  }
+
+  responderJson(respuesta, 201, { id });
+}
+
+async function manejarAnalisisImportacion(
+  solicitud: IncomingMessage,
+  respuesta: ServerResponse,
+  id: string,
+): Promise<void> {
+  const sesion = await obtenerSesionActual(solicitud);
+
+  if (!sesion || sesion.rol !== "administrador") {
+    responderJson(respuesta, 403, { error: "Solo los administradores pueden analizar mensajes." });
+    return;
+  }
+
+  if (!esUuid(id)) {
+    responderJson(respuesta, 400, { error: "La importación no es válida." });
+    return;
+  }
+
+  const importacion = await iniciarAnalisisImportacion(id);
+
+  if (!importacion) {
+    responderJson(respuesta, 409, { error: "Esta importación ya fue analizada o está en proceso." });
+    return;
+  }
+
+  try {
+    const analisis = await analizarMensajesConGemini(
+      importacion.contenido,
+      importacion.nombreObjetivo,
+    );
+    await guardarAnalisisImportacion(
+      id,
+      analisis.resumen,
+      analisis.patrones,
+      analisis.propuestas,
+    );
+    responderJson(respuesta, 200, {
+      ok: true,
+      propuestas: analisis.propuestas.length,
+    });
+  } catch (error) {
+    console.error("Error al analizar mensajes con Gemini:", error);
+    await marcarErrorAnalisisImportacion(
+      id,
+      "Gemini no pudo analizar este archivo. Puedes intentarlo de nuevo.",
+    );
+    responderJson(respuesta, 502, { error: "Gemini no pudo analizar este archivo." });
+  }
+}
+
+async function manejarEstadoPropuesta(
+  solicitud: IncomingMessage,
+  respuesta: ServerResponse,
+  id: string,
+): Promise<void> {
+  const sesion = await obtenerSesionActual(solicitud);
+
+  if (!sesion || sesion.rol !== "administrador") {
+    responderJson(respuesta, 403, { error: "Solo los administradores pueden revisar propuestas." });
+    return;
+  }
+
+  if (!esUuid(id)) {
+    responderJson(respuesta, 400, { error: "La propuesta no es válida." });
+    return;
+  }
+
+  let contenido: { estado?: unknown };
+
+  try {
+    contenido = await leerJson(solicitud);
+  } catch {
+    responderJson(respuesta, 400, { error: "El contenido enviado no es válido." });
+    return;
+  }
+
+  if (contenido.estado !== "aprobada" && contenido.estado !== "rechazada") {
+    responderJson(respuesta, 400, { error: "El estado de la propuesta no es válido." });
+    return;
+  }
+
+  const actualizada = await actualizarEstadoPropuesta(id, contenido.estado);
+  responderJson(
+    respuesta,
+    actualizada ? 200 : 404,
+    actualizada ? { ok: true } : { error: "Propuesta no encontrada." },
+  );
 }
 
 function esDiscordId(valor: string): boolean {
@@ -556,6 +746,25 @@ const servidor = createServer(async (solicitud, respuesta) => {
 
     if (solicitud.method === "POST" && ruta === "/api/trainers") {
       await manejarNuevoEntrenador(solicitud, respuesta);
+      return;
+    }
+
+    if (solicitud.method === "POST" && ruta === "/api/message-imports") {
+      await manejarNuevaImportacion(solicitud, respuesta);
+      return;
+    }
+
+    const coincidenciaAnalisis = ruta.match(/^\/api\/message-imports\/([^/]+)\/analyze$/);
+
+    if (solicitud.method === "POST" && coincidenciaAnalisis) {
+      await manejarAnalisisImportacion(solicitud, respuesta, coincidenciaAnalisis[1]);
+      return;
+    }
+
+    const coincidenciaPropuesta = ruta.match(/^\/api\/training-proposals\/([^/]+)$/);
+
+    if (solicitud.method === "PATCH" && coincidenciaPropuesta) {
+      await manejarEstadoPropuesta(solicitud, respuesta, coincidenciaPropuesta[1]);
       return;
     }
 

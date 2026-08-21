@@ -7,6 +7,7 @@ import { obtenerUsuarioPorDiscordId } from "../src/db/repository.js";
 import { pool } from "../src/db/client.js";
 
 const entradaPrueba = `prueba-panel-${randomUUID()}`;
+const archivoMensajesPrueba = `mensajes-panel-${randomUUID()}.txt`;
 const discordIdPrueba = `9${Date.now()}${Math.floor(Math.random() * 100000).toString().padStart(5, "0")}`;
 
 function crearCookie(sesion: {
@@ -49,9 +50,37 @@ try {
 
   const panelInicial = (await respuesta.json()) as {
     ejemplos: unknown[];
-    entrenadores: unknown[];
+    entrenadores: Array<{ id: string; esPrincipal: boolean }>;
+    importaciones: unknown[];
+    propuestas: unknown[];
     analiticas: { mensajes: number };
   };
+  const administradorPrincipal = panelInicial.entrenadores.find(
+    (entrenador) => entrenador.esPrincipal,
+  );
+
+  if (!administradorPrincipal) {
+    throw new Error("El panel no devolvió al administrador principal.");
+  }
+
+  const importacion = await fetch(`${configuracion.webUrl()}/api/message-imports`, {
+    method: "POST",
+    headers: {
+      Cookie: cookie,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      nombreArchivo: archivoMensajesPrueba,
+      formato: "txt",
+      nombreObjetivo: "Poke",
+      aportadoPorId: administradorPrincipal.id,
+      texto: "Andre: vas a entrar?\nPoke: ya voy oe",
+    }),
+  });
+
+  if (importacion.status !== 201) {
+    throw new Error(`La importación respondió con estado ${importacion.status}.`);
+  }
 
   const creacion = await fetch(`${configuracion.webUrl()}/api/examples`, {
     method: "POST",
@@ -226,6 +255,9 @@ try {
           [discordIdPrueba],
         )
       ).rows[0]?.importancia === 4,
+      importacionCreada: importacion.status === 201,
+      datosMensajesVisibles: Array.isArray(panelInicial.importaciones)
+        && Array.isArray(panelInicial.propuestas),
     }),
   );
 } finally {
@@ -240,6 +272,10 @@ try {
   await pool.query(
     `delete from usuarios where discord_user_id = $1`,
     [discordIdPrueba],
+  );
+  await pool.query(
+    `delete from importaciones_mensajes where nombre_archivo = $1`,
+    [archivoMensajesPrueba],
   );
   await pool.end();
 }

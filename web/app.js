@@ -9,10 +9,15 @@ const buscador = document.querySelector("#buscar-ejemplo");
 const formularioEntrenador = document.querySelector("#form-entrenador");
 const botonGuardarEntrenador = document.querySelector("#guardar-entrenador");
 const resultadoEntrenador = document.querySelector("#resultado-entrenador");
+const formularioImportacion = document.querySelector("#form-importacion");
+const archivoMensajes = document.querySelector("#archivo-mensajes");
+const botonGuardarImportacion = document.querySelector("#guardar-importacion");
+const resultadoImportacion = document.querySelector("#resultado-importacion");
 
 const secciones = {
   entrenar: ["Entrenar", "Crea ejemplos claros para definir el estilo."],
   ejemplos: ["Ejemplos", "Revisa lo que PokeBot está usando para aprender."],
+  mensajes: ["Mensajes", "Importa conversaciones y revisa lo que Gemini propone."],
   analiticas: ["Analíticas", "Observa cómo responden los amigos en Discord."],
   entrenadores: ["Entrenadores", "Administra accesos y el peso de cada persona."],
   caracteristicas: ["Características", "Consulta el modelo, permisos y equipo actual."],
@@ -77,6 +82,12 @@ function crearElemento(etiqueta, clase, texto) {
   if (clase) elemento.className = clase;
   if (texto !== undefined) elemento.textContent = texto;
   return elemento;
+}
+
+function mostrarAlerta(mensaje, esExito = false) {
+  alertaGlobal.textContent = mensaje;
+  alertaGlobal.classList.toggle("is-success", esExito);
+  alertaGlobal.hidden = false;
 }
 
 function fechaCorta(valor) {
@@ -219,8 +230,7 @@ async function guardarCambiosEntrenador(entrenador, controles, boton) {
     });
     await cargarDashboard();
   } catch (error) {
-    alertaGlobal.textContent = error.message;
-    alertaGlobal.hidden = false;
+    mostrarAlerta(error.message);
     boton.disabled = false;
     boton.textContent = "Guardar";
   }
@@ -289,11 +299,188 @@ function renderGestionEntrenadores() {
   }
 }
 
+function renderAportantes() {
+  const selector = document.querySelector("#aportado-por");
+  const valorActual = selector.value;
+  selector.replaceChildren();
+
+  for (const entrenador of estadoApp.datos.entrenadores.filter(
+    (item) => item.puedeEntrenar,
+  )) {
+    const opcion = crearElemento(
+      "option",
+      "",
+      `${entrenador.nombre} · peso ${entrenador.importancia}`,
+    );
+    opcion.value = entrenador.id;
+    opcion.selected = entrenador.id === valorActual;
+    selector.append(opcion);
+  }
+}
+
+async function analizarImportacion(importacion, boton, evento) {
+  evento.preventDefault();
+  evento.stopPropagation();
+  boton.disabled = true;
+  boton.textContent = "Analizando...";
+
+  try {
+    const resultado = await solicitar(`/api/message-imports/${importacion.id}/analyze`, {
+      method: "POST",
+    });
+    await cargarDashboard();
+    mostrarAlerta(`${resultado.propuestas} propuestas listas para revisar.`, true);
+  } catch (error) {
+    mostrarAlerta(error.message);
+    boton.disabled = false;
+    boton.textContent = importacion.estado === "error" ? "Reintentar" : "Analizar";
+  }
+}
+
+function renderImportaciones() {
+  const lista = document.querySelector("#lista-importaciones");
+  const importaciones = estadoApp.datos.importaciones ?? [];
+  lista.replaceChildren();
+  document.querySelector("#conteo-importaciones").textContent = `${importaciones.length} archivos`;
+
+  if (importaciones.length === 0) {
+    const vacio = crearElemento("div", "empty-state");
+    vacio.append(
+      crearElemento("strong", "", "Todavía no hay conversaciones"),
+      crearElemento("p", "", "Importa un archivo para iniciar el análisis."),
+    );
+    lista.append(vacio);
+    return;
+  }
+
+  const nombresEstado = {
+    pendiente: "Pendiente",
+    analizando: "Analizando",
+    listo: "Analizado",
+    error: "Error",
+  };
+
+  for (const importacion of importaciones) {
+    const analisisExpirado = importacion.estado === "analizando"
+      && importacion.analisisIniciadoAt
+      && Date.now() - new Date(importacion.analisisIniciadoAt).getTime() > 10 * 60 * 1000;
+    const fila = crearElemento("details", "import-row");
+    const resumen = crearElemento("summary", "import-summary");
+    const archivo = crearElemento("div", "import-file");
+    archivo.append(
+      crearElemento("strong", "", importacion.nombreArchivo),
+      crearElemento("span", "", `${importacion.formato.toUpperCase()} · Poke aparece como ${importacion.nombreObjetivo}`),
+    );
+    const aporte = crearElemento("span", "import-meta", `${importacion.aportadoPor} · peso ${importacion.importancia}`);
+    const estado = crearElemento(
+      "span",
+      `import-status${importacion.estado === "listo" ? " is-ready" : ""}${importacion.estado === "error" ? " is-error" : ""}`,
+      nombresEstado[importacion.estado],
+    );
+    resumen.append(archivo, aporte, estado);
+
+    if (importacion.estado === "pendiente" || importacion.estado === "error" || analisisExpirado) {
+      const boton = crearElemento(
+        "button",
+        "analyze-button",
+        importacion.estado === "pendiente" ? "Analizar" : "Reintentar",
+      );
+      boton.type = "button";
+      boton.addEventListener("click", (evento) => analizarImportacion(importacion, boton, evento));
+      resumen.append(boton);
+    } else {
+      resumen.append(crearElemento("span", "import-meta", `${importacion.propuestas} propuestas`));
+    }
+
+    const detalle = crearElemento("div", "import-detail");
+    detalle.append(crearElemento("p", "", importacion.error ?? importacion.resumen ?? "Esperando análisis."));
+    if (importacion.patrones?.length) {
+      const patrones = crearElemento("div", "pattern-list");
+      for (const patron of importacion.patrones) patrones.append(crearElemento("span", "", patron));
+      detalle.append(patrones);
+    }
+    fila.append(resumen, detalle);
+    lista.append(fila);
+  }
+}
+
+async function cambiarEstadoPropuesta(propuesta, estado, botones) {
+  for (const boton of botones) boton.disabled = true;
+
+  try {
+    await solicitar(`/api/training-proposals/${propuesta.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ estado }),
+    });
+    await cargarDashboard();
+  } catch (error) {
+    mostrarAlerta(error.message);
+    for (const boton of botones) boton.disabled = false;
+  }
+}
+
+function renderPropuestas() {
+  const lista = document.querySelector("#lista-propuestas");
+  const propuestas = estadoApp.datos.propuestas ?? [];
+  const pendientes = propuestas.filter((propuesta) => propuesta.estado === "pendiente").length;
+  lista.replaceChildren();
+  document.querySelector("#conteo-propuestas").textContent = `${pendientes} pendientes de ${propuestas.length}`;
+
+  if (propuestas.length === 0) {
+    const vacio = crearElemento("div", "empty-state");
+    vacio.append(
+      crearElemento("strong", "", "No hay propuestas"),
+      crearElemento("p", "", "Analiza una conversación para generarlas."),
+    );
+    lista.append(vacio);
+    return;
+  }
+
+  for (const propuesta of propuestas) {
+    const fila = crearElemento("article", "proposal-row");
+    const entrada = crearElemento("div", "proposal-copy");
+    entrada.append(crearElemento("span", "", "Mensaje"), crearElemento("p", "", propuesta.entrada));
+    const respuesta = crearElemento("div", "proposal-copy");
+    respuesta.append(crearElemento("span", "", "Respuesta de Poke"), crearElemento("p", "", propuesta.respuestaIdeal));
+    const fuente = crearElemento(
+      "div",
+      "proposal-source",
+      `${propuesta.nombreArchivo}\n${propuesta.aportadoPor} · peso ${propuesta.importancia}`,
+    );
+    const acciones = crearElemento("div", "proposal-actions");
+
+    if (propuesta.estado === "pendiente") {
+      const aprobar = crearElemento("button", "proposal-action is-approve", "Aprobar");
+      const rechazar = crearElemento("button", "proposal-action", "Rechazar");
+      aprobar.type = "button";
+      rechazar.type = "button";
+      const botones = [aprobar, rechazar];
+      aprobar.addEventListener("click", () => cambiarEstadoPropuesta(propuesta, "aprobada", botones));
+      rechazar.addEventListener("click", () => cambiarEstadoPropuesta(propuesta, "rechazada", botones));
+      acciones.append(aprobar, rechazar);
+    } else {
+      acciones.append(crearElemento(
+        "span",
+        `status-badge${propuesta.estado === "rechazada" ? " is-paused" : ""}`,
+        propuesta.estado === "aprobada" ? "Aprobada" : "Rechazada",
+      ));
+    }
+
+    fila.append(entrada, respuesta, fuente, acciones);
+    lista.append(fila);
+  }
+}
+
 function renderTodo() {
   renderEjemplos();
   renderAnaliticas();
   renderCaracteristicas();
   renderGestionEntrenadores();
+  if (estadoApp.usuario.rol === "administrador") {
+    renderAportantes();
+    renderImportaciones();
+    renderPropuestas();
+  }
 }
 
 async function cargarDashboard() {
@@ -302,8 +489,7 @@ async function cargarDashboard() {
     renderTodo();
     alertaGlobal.hidden = true;
   } catch (error) {
-    alertaGlobal.textContent = error.message;
-    alertaGlobal.hidden = false;
+    mostrarAlerta(error.message);
   }
 }
 
@@ -316,8 +502,7 @@ async function cambiarEstadoEjemplo(ejemplo, boton) {
     });
     await cargarDashboard();
   } catch (error) {
-    alertaGlobal.textContent = error.message;
-    alertaGlobal.hidden = false;
+    mostrarAlerta(error.message);
   } finally {
     boton.disabled = false;
   }
@@ -389,6 +574,53 @@ formularioEntrenador.addEventListener("submit", async (evento) => {
   }
 });
 
+archivoMensajes.addEventListener("change", () => {
+  document.querySelector("#archivo-nombre").textContent = archivoMensajes.files[0]?.name ?? "Seleccionar archivo";
+});
+
+formularioImportacion.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  const archivo = archivoMensajes.files[0];
+  const extension = archivo?.name.split(".").pop()?.toLowerCase();
+
+  if (!archivo || !["txt", "json", "csv"].includes(extension)) {
+    resultadoImportacion.textContent = "Selecciona un archivo TXT, JSON o CSV.";
+    resultadoImportacion.className = "form-result is-error";
+    return;
+  }
+
+  botonGuardarImportacion.disabled = true;
+  botonGuardarImportacion.textContent = "Importando...";
+  resultadoImportacion.textContent = "";
+  resultadoImportacion.className = "form-result";
+  const datos = new FormData(formularioImportacion);
+
+  try {
+    const texto = await archivo.text();
+    await solicitar("/api/message-imports", {
+      method: "POST",
+      body: JSON.stringify({
+        nombreArchivo: archivo.name,
+        formato: extension,
+        nombreObjetivo: datos.get("nombreObjetivo"),
+        aportadoPorId: datos.get("aportadoPorId"),
+        texto,
+      }),
+    });
+    formularioImportacion.reset();
+    document.querySelector("#archivo-nombre").textContent = "Seleccionar archivo";
+    resultadoImportacion.textContent = "Conversación importada.";
+    resultadoImportacion.classList.add("is-success");
+    await cargarDashboard();
+  } catch (error) {
+    resultadoImportacion.textContent = error.message;
+    resultadoImportacion.classList.add("is-error");
+  } finally {
+    botonGuardarImportacion.disabled = false;
+    botonGuardarImportacion.textContent = "Importar";
+  }
+});
+
 for (const boton of document.querySelectorAll("[data-tab]")) {
   boton.addEventListener("click", () => seleccionarTab(boton.dataset.tab));
 }
@@ -407,6 +639,7 @@ async function iniciar() {
     document.querySelector("#usuario-nombre").textContent = usuario.nombre;
     document.querySelector("#usuario-rol").textContent = usuario.rol;
     document.querySelector("#tab-entrenadores").hidden = usuario.rol !== "administrador";
+    document.querySelector("#tab-mensajes").hidden = usuario.rol !== "administrador";
     mostrarAvatar(usuario);
     landing.hidden = true;
     dashboard.hidden = false;
