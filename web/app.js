@@ -81,40 +81,23 @@ function seleccionarTab(nombre) {
   document.querySelector("#seccion-descripcion").textContent = secciones[nombre][1];
 }
 
-function crearPasosTutorial(rol) {
-  const pasosComunes = [
+function crearPasosTutorial() {
+  return [
     {
       tab: "entrenar",
-      titulo: "Así se entrena a PokeBot",
-      descripcion: "Escribe un mensaje y la respuesta que mejor representa a Poke. Los ejemplos claros hacen que el estilo sea más consistente.",
+      titulo: "Enséñale con ejemplos",
+      descripcion: "Escribe un mensaje y la respuesta que mejor representa a Poke. Mientras más natural sea el ejemplo, mejor aprenderá su forma de hablar.",
     },
     {
       tab: "ejemplos",
-      titulo: "Revisa lo que aprende",
-      descripcion: "Aquí puedes consultar los ejemplos activos y pausar los que ya no representen bien a Poke.",
+      titulo: "Mira lo que aprende",
+      descripcion: "Aquí quedan los ejemplos que usa PokeBot. Puedes revisar los aportes del resto y pausar los que ya no suenen a Poke.",
     },
     {
       tab: "analiticas",
-      titulo: "Mide cómo va",
-      descripcion: "Los pulgares de Discord aparecen aquí. Úsalos para saber si las respuestas se parecen cada vez más.",
+      titulo: "Dale feedback en Discord",
+      descripcion: "Cuando PokeBot responda, usa 👍 si acertó o 👎 si no. Es la forma más rápida de ayudarle a mejorar.",
     },
-  ];
-
-  if (rol !== "administrador") return pasosComunes;
-
-  return [
-    pasosComunes[0],
-    {
-      tab: "entrenadores",
-      titulo: "Organiza al equipo",
-      descripcion: "Autoriza a tus amigos y asigna su importancia. Un peso mayor hace que sus aportes influyan más en el estilo.",
-    },
-    {
-      tab: "mensajes",
-      titulo: "Aprovecha conversaciones reales",
-      descripcion: "Importa un archivo, deja que Gemini proponga ejemplos y aprueba solo los que realmente suenen a Poke.",
-    },
-    ...pasosComunes.slice(1),
   ];
 }
 
@@ -136,7 +119,7 @@ function renderTutorial() {
 }
 
 function iniciarTutorial() {
-  estadoApp.pasosTutorial = crearPasosTutorial(estadoApp.usuario.rol);
+  estadoApp.pasosTutorial = crearPasosTutorial();
   estadoApp.pasoTutorial = 0;
   dashboard.inert = true;
   document.body.classList.add("is-tutorial-active");
@@ -153,7 +136,8 @@ function avanzarTutorial(direccion) {
     tutorial.hidden = true;
     dashboard.inert = false;
     document.body.classList.remove("is-tutorial-active");
-    document.querySelector(`[data-tab="${estadoApp.pasosTutorial.at(-1).tab}"]`).focus();
+    seleccionarTab("entrenar");
+    document.querySelector('[data-tab="entrenar"]').focus();
     return;
   }
 
