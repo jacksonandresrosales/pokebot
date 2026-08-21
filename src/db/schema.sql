@@ -2,6 +2,22 @@
 
 create extension if not exists pgcrypto;
 
+create table if not exists usuarios (
+  id uuid primary key default gen_random_uuid(),
+  discord_user_id text not null unique,
+  nombre text not null,
+  rol text not null default 'entrenador'
+    check (rol in ('administrador', 'entrenador')),
+  puede_entrenar boolean not null default true,
+  consentimiento boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists usuarios_rol_idx
+  on usuarios (rol);
+
+alter table usuarios enable row level security;
+
 create table if not exists mensajes_bot (
   id uuid primary key default gen_random_uuid(),
   discord_message_id text not null unique,

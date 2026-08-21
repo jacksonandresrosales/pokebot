@@ -13,7 +13,7 @@ async function main(): Promise<void> {
       select table_name
       from information_schema.tables
       where table_schema = 'public'
-        and table_name in ('mensajes_bot', 'feedback', 'ejemplos_estilo')
+        and table_name in ('usuarios', 'mensajes_bot', 'feedback', 'ejemplos_estilo')
       order by table_name
     `,
   );
