@@ -442,9 +442,12 @@ textarea:focus-visible, input:focus-visible, select:focus-visible { border-color
   padding: 1rem 0;
   border-bottom: 1px solid var(--line);
 }
-.trainer-identity { min-width: 0; }
+.trainer-identity { display: flex; align-items: center; min-width: 0; gap: 0.7rem; }
+.trainer-copy { min-width: 0; }
 .trainer-identity strong { display: block; overflow: hidden; font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
-.trainer-identity span { display: block; margin-top: 0.25rem; color: var(--subtle); font-size: 0.66rem; }
+.trainer-identity .trainer-copy > span { display: block; margin-top: 0.25rem; color: var(--subtle); font-size: 0.66rem; }
+.trainer-avatar { display: grid; flex: 0 0 auto; width: 2rem; height: 2rem; place-items: center; overflow: hidden; border-radius: 7px; color: var(--accent-ink); background: var(--accent); font-size: 0.72rem; font-weight: 750; }
+.trainer-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .trainer-stats { display: flex; gap: 1rem; color: var(--muted); font-size: 0.68rem; }
 .trainer-controls { display: flex; align-items: center; gap: 0.55rem; }
 .trainer-controls select { min-height: 2.25rem; padding-inline: 0.55rem; font-size: 0.72rem; }

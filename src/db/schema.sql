@@ -6,6 +6,7 @@ create table if not exists usuarios (
   id uuid primary key default gen_random_uuid(),
   discord_user_id text not null unique,
   nombre text not null,
+  avatar_url text,
   rol text not null default 'entrenador'
     check (rol in ('administrador', 'entrenador')),
   puede_entrenar boolean not null default true,
@@ -25,6 +26,9 @@ alter table usuarios
 
 alter table usuarios
   add column if not exists tutorial_completado_at timestamptz;
+
+alter table usuarios
+  add column if not exists avatar_url text;
 
 alter table usuarios enable row level security;
 

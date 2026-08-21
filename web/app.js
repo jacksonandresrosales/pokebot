@@ -351,16 +351,41 @@ function renderGestionEntrenadores() {
 
   const entrenadores = estadoApp.datos.entrenadores;
   const activos = entrenadores.filter((entrenador) => entrenador.puedeEntrenar).length;
-  document.querySelector("#resumen-entrenadores").textContent = `${activos} con acceso de ${entrenadores.length}`;
+  const pendientes = entrenadores.length - activos;
+  document.querySelector("#resumen-entrenadores").textContent = `${activos} con acceso · ${pendientes} pendientes`;
   lista.replaceChildren();
 
   for (const entrenador of entrenadores) {
     const fila = crearElemento("article", "trainer-row");
     const identidad = crearElemento("div", "trainer-identity");
-    identidad.append(
+    const avatar = crearElemento("span", "trainer-avatar");
+    const inicial = entrenador.nombre.trim().charAt(0).toUpperCase() || "U";
+
+    if (entrenador.avatarUrl) {
+      const imagen = crearElemento("img");
+      imagen.src = entrenador.avatarUrl;
+      imagen.alt = `Avatar de ${entrenador.nombre}`;
+      imagen.addEventListener("error", () => {
+        imagen.remove();
+        avatar.textContent = inicial;
+      }, { once: true });
+      avatar.append(imagen);
+    } else {
+      avatar.textContent = inicial;
+    }
+
+    const copia = crearElemento("div", "trainer-copy");
+    copia.append(
       crearElemento("strong", "", entrenador.nombre),
-      crearElemento("span", entrenador.esPrincipal ? "principal-label" : "", entrenador.esPrincipal ? "Creador · acceso total" : entrenador.discordUserId),
+      crearElemento(
+        "span",
+        entrenador.esPrincipal ? "principal-label" : "",
+        entrenador.esPrincipal
+          ? "Creador · acceso total"
+          : `${entrenador.puedeEntrenar ? "Con acceso" : "Pendiente"} · ${entrenador.discordUserId}`,
+      ),
     );
+    identidad.append(avatar, copia);
 
     const estadisticas = crearElemento("div", "trainer-stats");
     estadisticas.append(

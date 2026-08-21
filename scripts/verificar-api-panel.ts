@@ -3,7 +3,7 @@ import "dotenv/config";
 import { createHmac, randomUUID } from "node:crypto";
 
 import { configuracion } from "../src/config/env.js";
-import { obtenerUsuarioPorDiscordId } from "../src/db/repository.js";
+import { obtenerUsuarioPorDiscordId, registrarUsuario } from "../src/db/repository.js";
 import { pool } from "../src/db/client.js";
 
 const entradaPrueba = `prueba-panel-${randomUUID()}`;
@@ -136,6 +136,15 @@ try {
     throw new Error(`La creación del rasgo respondió con estado ${creacionRasgo.status}.`);
   }
 
+  const perfilVisitante = await registrarUsuario(
+    discordIdPrueba,
+    "Entrenador temporal",
+    "https://cdn.discordapp.com/embed/avatars/0.png",
+  );
+
+  if (perfilVisitante.puedeEntrenar || !perfilVisitante.avatarUrl) {
+    throw new Error("El perfil visitante no quedó registrado como pendiente.");
+  }
 
   const nuevoEntrenador = await fetch(`${configuracion.webUrl()}/api/trainers`, {
     method: "POST",
@@ -334,6 +343,8 @@ try {
         )
       ).rows[0]?.activo === false,
       entrenadorCreado: nuevoEntrenador.status === 201,
+      perfilPendienteRegistrado: !perfilVisitante.puedeEntrenar
+        && Boolean(perfilVisitante.avatarUrl),
       tutorialCompletado: datosEntrenador.tutorialCompletado,
       entrenadorRestringido: intentoSinPermiso.status === 403,
       administradorSecundario: cambioComoAdministrador.ok,

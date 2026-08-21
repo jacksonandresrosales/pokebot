@@ -21,7 +21,7 @@ try {
           and table_name = $1
           and column_name = any($2::text[])
       `,
-      ["usuarios", ["importancia"]],
+      ["usuarios", ["importancia", "avatar_url"]],
     ),
     pool.query(
       `
@@ -93,7 +93,7 @@ try {
       analiticas,
       ejemplosConsultados: ejemplos.length,
       entrenadores: entrenadores.length,
-      columnaImportancia: columnas.rowCount === 1,
+      columnasPerfil: columnas.rowCount === 2,
       indiceFeedback: indiceFeedback.rowCount === 1,
       restriccionImportancia: restriccion.rowCount === 1,
       administradorPrincipal: entrenadores.some(

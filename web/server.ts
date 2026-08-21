@@ -777,6 +777,7 @@ async function manejarCallbackDiscord(
   const usuario = await registrarUsuario(
     usuarioDiscord.id,
     usuarioDiscord.global_name ?? usuarioDiscord.username,
+    avatarUrl,
   );
 
   establecerCookieSesion(respuesta, {

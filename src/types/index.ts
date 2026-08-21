@@ -10,6 +10,7 @@ export interface UsuarioEntrenador {
   id: string;
   discordUserId: string;
   nombre: string;
+  avatarUrl: string | null;
   rol: "administrador" | "entrenador";
   puedeEntrenar: boolean;
   importancia: number;

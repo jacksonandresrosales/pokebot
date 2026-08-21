@@ -63,6 +63,7 @@ export interface EntrenadorPanel {
   id: string;
   discordUserId: string;
   nombre: string;
+  avatarUrl: string | null;
   rol: UsuarioEntrenador["rol"];
   puedeEntrenar: boolean;
   importancia: number;
@@ -164,6 +165,7 @@ export async function obtenerUsuarioPorDiscordId(
         id,
         discord_user_id as "discordUserId",
         nombre,
+        avatar_url as "avatarUrl",
         rol,
         puede_entrenar as "puedeEntrenar",
         importancia,
@@ -418,6 +420,7 @@ export async function listarEntrenadores(): Promise<EntrenadorPanel[]> {
         usuarios.id,
         usuarios.discord_user_id as "discordUserId",
         nombre,
+        usuarios.avatar_url as "avatarUrl",
         rol,
         puede_entrenar as "puedeEntrenar",
         importancia::int,
@@ -800,6 +803,7 @@ export async function actualizarEstadoPropuesta(
 export async function registrarUsuario(
   discordUserId: string,
   nombre: string,
+  avatarUrl: string | null,
 ): Promise<UsuarioEntrenador> {
   const esAdministrador = discordUserId === configuracion.adminDiscordId();
   const resultado = await pool.query<UsuarioEntrenador>(
@@ -807,12 +811,14 @@ export async function registrarUsuario(
       insert into usuarios (
         discord_user_id,
         nombre,
+        avatar_url,
         rol,
         puede_entrenar,
         importancia
-      ) values ($1, $2, $3, $4, 3)
+      ) values ($1, $2, $5, $3, $4, 3)
       on conflict (discord_user_id) do update set
         nombre = excluded.nombre,
+        avatar_url = excluded.avatar_url,
         rol = case
           when usuarios.rol = 'administrador' then usuarios.rol
           when excluded.rol = 'administrador' then excluded.rol
@@ -826,6 +832,7 @@ export async function registrarUsuario(
         id,
         discord_user_id as "discordUserId",
         nombre,
+        avatar_url as "avatarUrl",
         rol,
         puede_entrenar as "puedeEntrenar",
         importancia,
@@ -836,6 +843,7 @@ export async function registrarUsuario(
       nombre,
       esAdministrador ? "administrador" : "entrenador",
       esAdministrador,
+      avatarUrl,
     ],
   );
 
