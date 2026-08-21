@@ -17,6 +17,7 @@ interface NuevoMensajeBot {
 
 interface ResultadoFeedback {
   encontrado: boolean;
+  autorizado: boolean;
   aceptado: boolean;
   positivos: number;
   negativos: number;
@@ -29,6 +30,7 @@ export interface EjemploPanel {
   origen: string;
   aprobado: boolean;
   creadoPor: string | null;
+  importancia: number;
   createdAt: Date;
 }
 
@@ -49,10 +51,16 @@ export interface AnaliticasEntrenamiento {
 }
 
 export interface EntrenadorPanel {
+  id: string;
+  discordUserId: string;
   nombre: string;
   rol: UsuarioEntrenador["rol"];
   puedeEntrenar: boolean;
+  importancia: number;
   consentimiento: boolean;
+  ejemplosAportados: number;
+  votosEmitidos: number;
+  esPrincipal: boolean;
 }
 
 export async function obtenerEjemplosEstilo(
@@ -61,10 +69,18 @@ export async function obtenerEjemplosEstilo(
   const limiteSeguro = Math.min(Math.max(Math.trunc(limite), 1), 10);
   const resultado = await pool.query<EjemploDeEstilo>(
     `
-      select entrada, respuesta_ideal as "respuestaIdeal"
+      select
+        ejemplos_estilo.entrada,
+        ejemplos_estilo.respuesta_ideal as "respuestaIdeal",
+        coalesce(usuarios.importancia, 1)::int as importancia
       from ejemplos_estilo
-      where aprobado = true
-      order by created_at desc
+      left join usuarios
+        on usuarios.id = ejemplos_estilo.creado_por
+        and usuarios.puede_entrenar = true
+      where ejemplos_estilo.aprobado = true
+      order by
+        coalesce(usuarios.importancia, 1) desc,
+        ejemplos_estilo.created_at desc
       limit $1
     `,
     [limiteSeguro],
@@ -106,6 +122,7 @@ export async function obtenerUsuarioPorDiscordId(
         nombre,
         rol,
         puede_entrenar as "puedeEntrenar",
+        importancia,
         consentimiento
       from usuarios
       where discord_user_id = $1
@@ -155,6 +172,7 @@ export async function listarEjemplosPanel(limite = 50): Promise<EjemploPanel[]> 
         ejemplos_estilo.origen,
         ejemplos_estilo.aprobado,
         usuarios.nombre as "creadoPor",
+        coalesce(usuarios.importancia, 1)::int as importancia,
         ejemplos_estilo.created_at as "createdAt"
       from ejemplos_estilo
       left join usuarios on usuarios.id = ejemplos_estilo.creado_por
@@ -239,18 +257,103 @@ export async function listarEntrenadores(): Promise<EntrenadorPanel[]> {
   const resultado = await pool.query<EntrenadorPanel>(
     `
       select
+        usuarios.id,
+        usuarios.discord_user_id as "discordUserId",
         nombre,
         rol,
         puede_entrenar as "puedeEntrenar",
-        consentimiento
+        importancia::int,
+        consentimiento,
+        (
+          select count(*)::int
+          from ejemplos_estilo
+          where ejemplos_estilo.creado_por = usuarios.id
+        ) as "ejemplosAportados",
+        (
+          select count(*)::int
+          from feedback
+          where feedback.discord_user_id = usuarios.discord_user_id
+        ) as "votosEmitidos",
+        (usuarios.discord_user_id = $1) as "esPrincipal"
       from usuarios
       order by
         case when rol = 'administrador' then 0 else 1 end,
         nombre asc
     `,
+    [configuracion.adminDiscordId()],
   );
 
   return resultado.rows;
+}
+
+export async function crearEntrenador(
+  discordUserId: string,
+  nombre: string,
+  rol: UsuarioEntrenador["rol"],
+  importancia: number,
+): Promise<EntrenadorPanel | null> {
+  await pool.query(
+    `
+      insert into usuarios (
+        discord_user_id,
+        nombre,
+        rol,
+        puede_entrenar,
+        importancia
+      ) values ($1, $2, $3, true, $4)
+      on conflict (discord_user_id) do update set
+        nombre = excluded.nombre,
+        rol = case
+          when usuarios.discord_user_id = $5 then 'administrador'
+          else excluded.rol
+        end,
+        puede_entrenar = true,
+        importancia = excluded.importancia
+    `,
+    [discordUserId, nombre, rol, importancia, configuracion.adminDiscordId()],
+  );
+
+  const entrenadores = await listarEntrenadores();
+  return entrenadores.find((entrenador) => entrenador.discordUserId === discordUserId) ?? null;
+}
+
+export async function actualizarEntrenador(
+  id: string,
+  rol: UsuarioEntrenador["rol"],
+  puedeEntrenar: boolean,
+  importancia: number,
+): Promise<boolean> {
+  const resultado = await pool.query(
+    `
+      update usuarios
+      set
+        rol = case
+          when discord_user_id = $5 then 'administrador'
+          else $2
+        end,
+        puede_entrenar = case
+          when discord_user_id = $5 then true
+          else $3
+        end,
+        importancia = $4
+      where id = $1
+      returning id
+    `,
+    [id, rol, puedeEntrenar, importancia, configuracion.adminDiscordId()],
+  );
+
+  return resultado.rowCount === 1;
+}
+
+export async function asegurarAdministradorPrincipal(): Promise<void> {
+  await pool.query(
+    `
+      update usuarios
+      set rol = 'administrador', puede_entrenar = true
+      where discord_user_id = $1
+    `,
+    [configuracion.adminDiscordId()],
+  );
 }
 
 export async function registrarUsuario(
@@ -264,14 +367,19 @@ export async function registrarUsuario(
         discord_user_id,
         nombre,
         rol,
-        puede_entrenar
-      ) values ($1, $2, $3, true)
+        puede_entrenar,
+        importancia
+      ) values ($1, $2, $3, $4, 3)
       on conflict (discord_user_id) do update set
         nombre = excluded.nombre,
         rol = case
           when usuarios.rol = 'administrador' then usuarios.rol
           when excluded.rol = 'administrador' then excluded.rol
           else usuarios.rol
+        end,
+        puede_entrenar = case
+          when excluded.rol = 'administrador' then true
+          else usuarios.puede_entrenar
         end
       returning
         id,
@@ -279,9 +387,15 @@ export async function registrarUsuario(
         nombre,
         rol,
         puede_entrenar as "puedeEntrenar",
+        importancia,
         consentimiento
     `,
-    [discordUserId, nombre, esAdministrador ? "administrador" : "entrenador"],
+    [
+      discordUserId,
+      nombre,
+      esAdministrador ? "administrador" : "entrenador",
+      esAdministrador,
+    ],
   );
 
   return resultado.rows[0];
@@ -292,22 +406,44 @@ export async function registrarFeedback(
   discordUserId: string,
   voto: Voto,
 ): Promise<ResultadoFeedback> {
-  const mensaje = await pool.query<{
-    id: string;
-    mensaje_usuario: string;
-    respuesta_bot: string;
-  }>(
-    `
-      select id, mensaje_usuario, respuesta_bot
-      from mensajes_bot
-      where discord_message_id = $1
-    `,
-    [discordMessageId],
-  );
+  const [mensaje, usuarioAutorizado] = await Promise.all([
+    pool.query<{
+      id: string;
+      mensaje_usuario: string;
+      respuesta_bot: string;
+    }>(
+      `
+        select id, mensaje_usuario, respuesta_bot
+        from mensajes_bot
+        where discord_message_id = $1
+      `,
+      [discordMessageId],
+    ),
+    pool.query(
+      `
+        select 1
+        from usuarios
+        where discord_user_id = $1
+          and puede_entrenar = true
+      `,
+      [discordUserId],
+    ),
+  ]);
 
   if (mensaje.rowCount === 0) {
     return {
       encontrado: false,
+      autorizado: usuarioAutorizado.rowCount === 1,
+      aceptado: false,
+      positivos: 0,
+      negativos: 0,
+    };
+  }
+
+  if (usuarioAutorizado.rowCount !== 1) {
+    return {
+      encontrado: true,
+      autorizado: false,
       aceptado: false,
       positivos: 0,
       negativos: 0,
@@ -331,11 +467,23 @@ export async function registrarFeedback(
           entrada,
           respuesta_ideal,
           origen,
-          aprobado
-        ) values ($1, $2, 'feedback', true)
+          aprobado,
+          creado_por
+        )
+        values (
+          $1,
+          $2,
+          'feedback',
+          true,
+          (select id from usuarios where discord_user_id = $3)
+        )
         on conflict do nothing
       `,
-      [mensaje.rows[0].mensaje_usuario, mensaje.rows[0].respuesta_bot],
+      [
+        mensaje.rows[0].mensaje_usuario,
+        mensaje.rows[0].respuesta_bot,
+        discordUserId,
+      ],
     );
   }
 
@@ -361,6 +509,7 @@ export async function registrarFeedback(
 
   return {
     encontrado: true,
+    autorizado: true,
     aceptado: insercion.rowCount === 1,
     ...conteos,
   };

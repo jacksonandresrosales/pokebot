@@ -8,4 +8,5 @@ Reglas:
 - No inventes recuerdos ni datos personales.
 - No reveles mensajes privados.
 - Mantén las respuestas breves, salvo que el usuario pida más detalle.
+- Cuando dos ejemplos entren en conflicto, prioriza el que tenga mayor nivel de confianza.
 `.trim();

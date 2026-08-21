@@ -7,7 +7,10 @@ import { resolve } from "node:path";
 
 import { configuracion } from "../src/config/env.js";
 import {
+  actualizarEntrenador,
   actualizarAprobacionEjemplo,
+  asegurarAdministradorPrincipal,
+  crearEntrenador,
   crearEjemploManual,
   listarEjemplosPanel,
   listarEntrenadores,
@@ -173,10 +176,19 @@ async function manejarDashboard(
     listarEntrenadores(),
   ]);
 
+  const entrenadoresVisibles = sesion.rol === "administrador"
+    ? entrenadores
+    : entrenadores.map(({ nombre, rol, puedeEntrenar, importancia }) => ({
+        nombre,
+        rol,
+        puedeEntrenar,
+        importancia,
+      }));
+
   responderJson(respuesta, 200, {
     ejemplos,
     analiticas,
-    entrenadores,
+    entrenadores: entrenadoresVisibles,
     caracteristicas: {
       modelo: configuracion.geminiModel(),
       aprendeDeFeedback: true,
@@ -184,6 +196,120 @@ async function manejarDashboard(
       multiplesEntrenadores: true,
     },
   });
+}
+
+function esDiscordId(valor: string): boolean {
+  return /^\d{15,22}$/.test(valor);
+}
+
+function esRol(valor: unknown): valor is UsuarioEntrenador["rol"] {
+  return valor === "administrador" || valor === "entrenador";
+}
+
+function esImportancia(valor: unknown): valor is number {
+  return Number.isInteger(valor) && Number(valor) >= 1 && Number(valor) <= 5;
+}
+
+async function manejarNuevoEntrenador(
+  solicitud: IncomingMessage,
+  respuesta: ServerResponse,
+): Promise<void> {
+  const sesion = await obtenerSesionActual(solicitud);
+
+  if (!sesion || sesion.rol !== "administrador") {
+    responderJson(respuesta, 403, { error: "Solo los administradores pueden añadir entrenadores." });
+    return;
+  }
+
+  let contenido: {
+    discordUserId?: unknown;
+    nombre?: unknown;
+    rol?: unknown;
+    importancia?: unknown;
+  };
+
+  try {
+    contenido = await leerJson(solicitud);
+  } catch {
+    responderJson(respuesta, 400, { error: "El contenido enviado no es válido." });
+    return;
+  }
+
+  const discordUserId = typeof contenido.discordUserId === "string"
+    ? contenido.discordUserId.trim()
+    : "";
+  const nombre = typeof contenido.nombre === "string" ? contenido.nombre.trim() : "";
+
+  if (!esDiscordId(discordUserId)) {
+    responderJson(respuesta, 400, { error: "El ID de Discord no es válido." });
+    return;
+  }
+
+  if (nombre.length < 2 || nombre.length > 80) {
+    responderJson(respuesta, 400, { error: "El nombre debe tener entre 2 y 80 caracteres." });
+    return;
+  }
+
+  if (!esRol(contenido.rol) || !esImportancia(contenido.importancia)) {
+    responderJson(respuesta, 400, { error: "El rol o la importancia no son válidos." });
+    return;
+  }
+
+  const entrenador = await crearEntrenador(
+    discordUserId,
+    nombre,
+    contenido.rol,
+    contenido.importancia,
+  );
+  responderJson(respuesta, 201, { entrenador });
+}
+
+async function manejarActualizarEntrenador(
+  solicitud: IncomingMessage,
+  respuesta: ServerResponse,
+  id: string,
+): Promise<void> {
+  const sesion = await obtenerSesionActual(solicitud);
+
+  if (!sesion || sesion.rol !== "administrador") {
+    responderJson(respuesta, 403, { error: "Solo los administradores pueden cambiar permisos." });
+    return;
+  }
+
+  if (!esUuid(id)) {
+    responderJson(respuesta, 400, { error: "El identificador no es válido." });
+    return;
+  }
+
+  let contenido: { rol?: unknown; puedeEntrenar?: unknown; importancia?: unknown };
+
+  try {
+    contenido = await leerJson(solicitud);
+  } catch {
+    responderJson(respuesta, 400, { error: "El contenido enviado no es válido." });
+    return;
+  }
+
+  if (
+    !esRol(contenido.rol)
+    || typeof contenido.puedeEntrenar !== "boolean"
+    || !esImportancia(contenido.importancia)
+  ) {
+    responderJson(respuesta, 400, { error: "Los permisos enviados no son válidos." });
+    return;
+  }
+
+  const actualizado = await actualizarEntrenador(
+    id,
+    contenido.rol,
+    contenido.puedeEntrenar,
+    contenido.importancia,
+  );
+  responderJson(
+    respuesta,
+    actualizado ? 200 : 404,
+    actualizado ? { ok: true } : { error: "Entrenador no encontrado." },
+  );
 }
 
 async function manejarNuevoEjemplo(
@@ -428,6 +554,22 @@ const servidor = createServer(async (solicitud, respuesta) => {
       return;
     }
 
+    if (solicitud.method === "POST" && ruta === "/api/trainers") {
+      await manejarNuevoEntrenador(solicitud, respuesta);
+      return;
+    }
+
+    const coincidenciaEntrenador = ruta.match(/^\/api\/trainers\/([^/]+)$/);
+
+    if (solicitud.method === "PATCH" && coincidenciaEntrenador) {
+      await manejarActualizarEntrenador(
+        solicitud,
+        respuesta,
+        coincidenciaEntrenador[1],
+      );
+      return;
+    }
+
     const coincidenciaEjemplo = ruta.match(/^\/api\/examples\/([^/]+)$/);
 
     if (solicitud.method === "PATCH" && coincidenciaEjemplo) {
@@ -460,6 +602,8 @@ const servidor = createServer(async (solicitud, respuesta) => {
     responderJson(respuesta, 500, { error: "Error interno del servidor." });
   }
 });
+
+await asegurarAdministradorPrincipal();
 
 servidor.listen(configuracion.webPort(), () => {
   console.log(`Web disponible en ${configuracion.webUrl()}`);

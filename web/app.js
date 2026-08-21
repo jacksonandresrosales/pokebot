@@ -6,11 +6,15 @@ const formulario = document.querySelector("#form-ejemplo");
 const botonGuardar = document.querySelector("#guardar-ejemplo");
 const resultadoFormulario = document.querySelector("#resultado-formulario");
 const buscador = document.querySelector("#buscar-ejemplo");
+const formularioEntrenador = document.querySelector("#form-entrenador");
+const botonGuardarEntrenador = document.querySelector("#guardar-entrenador");
+const resultadoEntrenador = document.querySelector("#resultado-entrenador");
 
 const secciones = {
   entrenar: ["Entrenar", "Crea ejemplos claros para definir el estilo."],
   ejemplos: ["Ejemplos", "Revisa lo que PokeBot está usando para aprender."],
   analiticas: ["Analíticas", "Observa cómo responden los amigos en Discord."],
+  entrenadores: ["Entrenadores", "Administra accesos y el peso de cada persona."],
   caracteristicas: ["Características", "Consulta el modelo, permisos y equipo actual."],
 };
 
@@ -111,6 +115,7 @@ function renderEjemplos() {
     meta.append(
       crearElemento("span", "", ejemplo.origen === "manual" ? "Manual" : "Feedback"),
       crearElemento("span", "", fechaCorta(ejemplo.createdAt)),
+      crearElemento("span", "", `Peso ${ejemplo.importancia}`),
     );
     if (ejemplo.creadoPor) meta.append(crearElemento("span", "", ejemplo.creadoPor));
     respuesta.append(meta);
@@ -173,8 +178,113 @@ function renderCaracteristicas() {
     const fila = crearElemento("div", "team-row");
     fila.append(
       crearElemento("strong", "", entrenador.nombre),
-      crearElemento("span", "", entrenador.puedeEntrenar ? entrenador.rol : "sin acceso"),
+      crearElemento(
+        "span",
+        "",
+        entrenador.puedeEntrenar
+          ? `${entrenador.rol} · importancia ${entrenador.importancia}`
+          : "sin acceso",
+      ),
     );
+    lista.append(fila);
+  }
+}
+
+function crearSelector(opciones, valorActual, etiqueta) {
+  const selector = crearElemento("select");
+  selector.setAttribute("aria-label", etiqueta);
+
+  for (const [valor, texto] of opciones) {
+    const opcion = crearElemento("option", "", texto);
+    opcion.value = valor;
+    opcion.selected = String(valorActual) === valor;
+    selector.append(opcion);
+  }
+
+  return selector;
+}
+
+async function guardarCambiosEntrenador(entrenador, controles, boton) {
+  boton.disabled = true;
+  boton.textContent = "Guardando...";
+
+  try {
+    await solicitar(`/api/trainers/${entrenador.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        rol: controles.rol.value,
+        puedeEntrenar: controles.acceso.checked,
+        importancia: Number(controles.importancia.value),
+      }),
+    });
+    await cargarDashboard();
+  } catch (error) {
+    alertaGlobal.textContent = error.message;
+    alertaGlobal.hidden = false;
+    boton.disabled = false;
+    boton.textContent = "Guardar";
+  }
+}
+
+function renderGestionEntrenadores() {
+  const lista = document.querySelector("#lista-gestion-entrenadores");
+
+  if (estadoApp.usuario.rol !== "administrador") {
+    lista.replaceChildren();
+    return;
+  }
+
+  const entrenadores = estadoApp.datos.entrenadores;
+  const activos = entrenadores.filter((entrenador) => entrenador.puedeEntrenar).length;
+  document.querySelector("#resumen-entrenadores").textContent = `${activos} con acceso de ${entrenadores.length}`;
+  lista.replaceChildren();
+
+  for (const entrenador of entrenadores) {
+    const fila = crearElemento("article", "trainer-row");
+    const identidad = crearElemento("div", "trainer-identity");
+    identidad.append(
+      crearElemento("strong", "", entrenador.nombre),
+      crearElemento("span", entrenador.esPrincipal ? "principal-label" : "", entrenador.esPrincipal ? "Creador · acceso total" : entrenador.discordUserId),
+    );
+
+    const estadisticas = crearElemento("div", "trainer-stats");
+    estadisticas.append(
+      crearElemento("span", "", `${entrenador.ejemplosAportados} ejemplos`),
+      crearElemento("span", "", `${entrenador.votosEmitidos} votos`),
+    );
+
+    const rol = crearSelector([
+      ["entrenador", "Entrenador"],
+      ["administrador", "Administrador"],
+    ], entrenador.rol, `Rol de ${entrenador.nombre}`);
+    const importancia = crearSelector([
+      ["1", "Peso 1"],
+      ["2", "Peso 2"],
+      ["3", "Peso 3"],
+      ["4", "Peso 4"],
+      ["5", "Peso 5"],
+    ], entrenador.importancia, `Importancia de ${entrenador.nombre}`);
+    const acceso = crearElemento("input");
+    acceso.type = "checkbox";
+    acceso.checked = entrenador.puedeEntrenar;
+    acceso.disabled = entrenador.esPrincipal;
+    rol.disabled = entrenador.esPrincipal;
+
+    const etiquetaAcceso = crearElemento("label", "access-toggle");
+    etiquetaAcceso.append(acceso, crearElemento("span", "", "Acceso"));
+
+    const controles = crearElemento("div", "trainer-controls");
+    controles.append(rol, importancia, etiquetaAcceso);
+
+    const guardar = crearElemento("button", "trainer-save", "Guardar");
+    guardar.type = "button";
+    guardar.addEventListener("click", () => guardarCambiosEntrenador(
+      entrenador,
+      { rol, importancia, acceso },
+      guardar,
+    ));
+
+    fila.append(identidad, estadisticas, controles, guardar);
     lista.append(fila);
   }
 }
@@ -183,6 +293,7 @@ function renderTodo() {
   renderEjemplos();
   renderAnaliticas();
   renderCaracteristicas();
+  renderGestionEntrenadores();
 }
 
 async function cargarDashboard() {
@@ -247,6 +358,37 @@ buscador.addEventListener("input", () => {
   renderEjemplos();
 });
 
+formularioEntrenador.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  botonGuardarEntrenador.disabled = true;
+  botonGuardarEntrenador.textContent = "Autorizando...";
+  resultadoEntrenador.textContent = "";
+  resultadoEntrenador.className = "form-result";
+  const datos = new FormData(formularioEntrenador);
+
+  try {
+    await solicitar("/api/trainers", {
+      method: "POST",
+      body: JSON.stringify({
+        nombre: datos.get("nombre"),
+        discordUserId: datos.get("discordUserId"),
+        rol: datos.get("rol"),
+        importancia: Number(datos.get("importancia")),
+      }),
+    });
+    formularioEntrenador.reset();
+    resultadoEntrenador.textContent = "Entrenador autorizado.";
+    resultadoEntrenador.classList.add("is-success");
+    await cargarDashboard();
+  } catch (error) {
+    resultadoEntrenador.textContent = error.message;
+    resultadoEntrenador.classList.add("is-error");
+  } finally {
+    botonGuardarEntrenador.disabled = false;
+    botonGuardarEntrenador.textContent = "Autorizar";
+  }
+});
+
 for (const boton of document.querySelectorAll("[data-tab]")) {
   boton.addEventListener("click", () => seleccionarTab(boton.dataset.tab));
 }
@@ -264,6 +406,7 @@ async function iniciar() {
     estadoApp.usuario = usuario;
     document.querySelector("#usuario-nombre").textContent = usuario.nombre;
     document.querySelector("#usuario-rol").textContent = usuario.rol;
+    document.querySelector("#tab-entrenadores").hidden = usuario.rol !== "administrador";
     mostrarAvatar(usuario);
     landing.hidden = true;
     dashboard.hidden = false;

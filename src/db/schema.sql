@@ -9,12 +9,18 @@ create table if not exists usuarios (
   rol text not null default 'entrenador'
     check (rol in ('administrador', 'entrenador')),
   puede_entrenar boolean not null default true,
+  importancia smallint not null default 3
+    check (importancia between 1 and 5),
   consentimiento boolean not null default false,
   created_at timestamptz not null default now()
 );
 
 create index if not exists usuarios_rol_idx
   on usuarios (rol);
+
+alter table usuarios
+  add column if not exists importancia smallint not null default 3
+    check (importancia between 1 and 5);
 
 alter table usuarios enable row level security;
 
@@ -70,6 +76,9 @@ create index if not exists ejemplos_estilo_creado_por_idx
 
 create index if not exists feedback_created_at_idx
   on feedback (created_at desc);
+
+create index if not exists feedback_discord_user_id_idx
+  on feedback (discord_user_id);
 
 alter table mensajes_bot enable row level security;
 alter table feedback enable row level security;

@@ -100,6 +100,14 @@ export async function iniciarBot(): Promise<void> {
         return;
       }
 
+      if (!resultado.autorizado) {
+        await interaccion.reply({
+          content: "No tienes permiso para entrenar a PokeBot.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
       if (!resultado.aceptado) {
         await interaccion.reply({
           content: "Ya registraste un voto para esta respuesta.",

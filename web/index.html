@@ -49,6 +49,7 @@
           <button class="tab is-active" type="button" data-tab="entrenar" aria-selected="true">Entrenar</button>
           <button class="tab" type="button" data-tab="ejemplos" aria-selected="false">Ejemplos</button>
           <button class="tab" type="button" data-tab="analiticas" aria-selected="false">Analíticas</button>
+          <button id="tab-entrenadores" class="tab" type="button" data-tab="entrenadores" aria-selected="false" hidden>Entrenadores</button>
           <button class="tab" type="button" data-tab="caracteristicas" aria-selected="false">Características</button>
         </nav>
 
@@ -146,6 +147,60 @@
               <span>Precisión percibida</span>
               <strong id="ratio-positivo">0%</strong>
               <p>Porcentaje de votos positivos sobre el feedback total.</p>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="entrenadores" hidden>
+          <div class="trainer-layout">
+            <form id="form-entrenador" class="trainer-form">
+              <header>
+                <h2>Añadir entrenador</h2>
+                <p>Autoriza a un amigo con su ID de Discord.</p>
+              </header>
+
+              <div class="field-row">
+                <label class="field" for="entrenador-nombre">
+                  <span>Nombre</span>
+                  <input id="entrenador-nombre" name="nombre" type="text" minlength="2" maxlength="80" required autocomplete="off" />
+                </label>
+                <label class="field" for="entrenador-discord-id">
+                  <span>ID de Discord</span>
+                  <input id="entrenador-discord-id" name="discordUserId" type="text" inputmode="numeric" pattern="[0-9]{15,22}" required autocomplete="off" />
+                </label>
+              </div>
+
+              <div class="field-row field-row-compact">
+                <label class="field" for="entrenador-rol">
+                  <span>Rol</span>
+                  <select id="entrenador-rol" name="rol">
+                    <option value="entrenador">Entrenador</option>
+                    <option value="administrador">Administrador</option>
+                  </select>
+                </label>
+                <label class="field" for="entrenador-importancia">
+                  <span>Importancia</span>
+                  <select id="entrenador-importancia" name="importancia">
+                    <option value="1">1 · Baja</option>
+                    <option value="2">2</option>
+                    <option value="3" selected>3 · Normal</option>
+                    <option value="4">4</option>
+                    <option value="5">5 · Máxima</option>
+                  </select>
+                </label>
+                <button id="guardar-entrenador" class="button button-accent" type="submit">Autorizar</button>
+              </div>
+              <span id="resultado-entrenador" class="form-result" aria-live="polite"></span>
+            </form>
+
+            <section class="trainer-directory" aria-labelledby="entrenadores-titulo">
+              <header>
+                <div>
+                  <h2 id="entrenadores-titulo">Accesos</h2>
+                  <p id="resumen-entrenadores"></p>
+                </div>
+              </header>
+              <div id="lista-gestion-entrenadores" class="trainer-list" aria-live="polite"></div>
             </section>
           </div>
         </section>
